@@ -1,7 +1,7 @@
 ---
 title: Sit With Me
 emoji: 🧠
-colorFrom: violet
+colorFrom: purple
 colorTo: pink
 sdk: docker
 app_port: 7860
