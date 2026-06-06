@@ -188,6 +188,10 @@ interface AppState {
   setDailyChallenge: (challenge: DailyChallenge | null) => void
   completeDailyChallenge: () => void
 
+  // Quick Notes
+  quickNotes: string
+  setQuickNotes: (notes: string) => void
+
   // Actions
   setView: (view: AppView) => void
   setTab: (tab: AppTab) => void
@@ -360,6 +364,10 @@ export const useAppStore = create<AppState>()(
         }
       }),
 
+      // Quick Notes
+      quickNotes: '',
+      setQuickNotes: (notes) => set({ quickNotes: notes }),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -387,7 +395,7 @@ export const useAppStore = create<AppState>()(
         pomodoroState: { running: false, timeLeft: 25 * 60, sessionsCompleted: 0, mode: 'work' as const },
         learningResources: [], bookmarkedMessages: [], focusMode: false,
         confettiActive: false, currentView: 'landing',
-        sessionSummaries: [], dailyChallenge: null,
+        sessionSummaries: [], dailyChallenge: null, quickNotes: '',
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -458,7 +466,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v7',
+      name: 'sitwithme-v8',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -505,6 +513,7 @@ export const useAppStore = create<AppState>()(
         theme: state.theme,
         sessionSummaries: state.sessionSummaries,
         dailyChallenge: state.dailyChallenge,
+        quickNotes: state.quickNotes,
       }),
     }
   )

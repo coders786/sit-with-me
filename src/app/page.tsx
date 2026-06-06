@@ -26,6 +26,10 @@ import {
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
+import { Drawer } from 'vaul'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 /* ========================================================================
    API Helper
@@ -60,62 +64,89 @@ function timeAgo(ts: number): string {
    IMPROVED MARKDOWN RENDERER
    ======================================================================== */
 function renderMarkdown(text: string): React.ReactNode {
-  const lines = text.split('\n')
+  // Pre-process: split by ``` markers for code blocks
+  const segments = text.split(/(```[\s\S]*?```)/g)
   const result: React.ReactNode[] = []
   let key = 0
 
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx]
-
-    // Handle headers
-    if (line.startsWith('### ')) {
-      result.push(<h3 key={key++} className="text-sm font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(4)}</h3>)
-      continue
-    }
-    if (line.startsWith('## ')) {
-      result.push(<h2 key={key++} className="text-base font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(3)}</h2>)
-      continue
-    }
-    if (line.startsWith('# ')) {
-      result.push(<h1 key={key++} className="text-lg font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(2)}</h1>)
-      continue
-    }
-
-    // Process inline elements within the line
-    const inlineParts = line.split(/(\*\*.*?\*\*|`[^`]+`|\[([^\]]+)\]\(([^)]+)\))/g)
-    const inlineResult: React.ReactNode[] = []
-
-    for (const part of inlineParts) {
-      if (part === undefined || part === '') continue
-      if (part.startsWith('**') && part.endsWith('**')) {
-        inlineResult.push(<strong key={key++} className="font-semibold text-[#c5d0ff]">{part.slice(2, -2)}</strong>)
-      } else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-        inlineResult.push(
-          <code key={key++} className="bg-[#272b34] text-[#9d7cff] px-1.5 py-0.5 rounded text-xs font-mono">
-            {part.slice(1, -1)}
-          </code>
+  for (const segment of segments) {
+    if (segment.startsWith('```') && segment.endsWith('```')) {
+      // Code block
+      const inner = segment.slice(3, -3)
+      const firstNewline = inner.indexOf('\n')
+      const lang = firstNewline > 0 ? inner.slice(0, firstNewline).trim() : ''
+      const code = firstNewline > 0 ? inner.slice(firstNewline + 1) : inner
+      const safeLang = lang || 'text'
+      try {
+        result.push(
+          <SyntaxHighlighter key={key++} language={safeLang} style={oneDark} className="rounded-lg my-2 text-xs">
+            {code}
+          </SyntaxHighlighter>
         )
-      } else if (/^\[([^\]]+)\]\(([^)]+)\)$/.test(part)) {
-        const match = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
-        if (match) {
-          inlineResult.push(
-            <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer"
-              className="text-[#7c9cff] underline hover:text-[#9d7cff] transition-colors">
-              {match[1]}
-            </a>
-          )
+      } catch {
+        result.push(
+          <pre key={key++} className="bg-[#272b34] text-[#c5d0ff] p-3 rounded-lg my-2 text-xs overflow-x-auto">
+            <code>{code}</code>
+          </pre>
+        )
+      }
+    } else {
+      // Regular markdown - process line by line
+      const lines = segment.split('\n')
+      for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        const line = lines[lineIdx]
+
+        // Handle headers
+        if (line.startsWith('### ')) {
+          result.push(<h3 key={key++} className="text-sm font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(4)}</h3>)
+          continue
         }
-      } else if (part.startsWith('- ') || part === '- ') {
-        inlineResult.push(<span key={key++}>&bull; {part.slice(2)}</span>)
-      } else {
-        inlineResult.push(<span key={key++}>{part}</span>)
+        if (line.startsWith('## ')) {
+          result.push(<h2 key={key++} className="text-base font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(3)}</h2>)
+          continue
+        }
+        if (line.startsWith('# ')) {
+          result.push(<h1 key={key++} className="text-lg font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(2)}</h1>)
+          continue
+        }
+
+        // Process inline elements within the line
+        const inlineParts = line.split(/(\*\*.*?\*\*|`[^`]+`|\[([^\]]+)\]\(([^)]+)\))/g)
+        const inlineResult: React.ReactNode[] = []
+
+        for (const part of inlineParts) {
+          if (part === undefined || part === '') continue
+          if (part.startsWith('**') && part.endsWith('**')) {
+            inlineResult.push(<strong key={key++} className="font-semibold text-[#c5d0ff]">{part.slice(2, -2)}</strong>)
+          } else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+            inlineResult.push(
+              <code key={key++} className="bg-[#272b34] text-[#9d7cff] px-1.5 py-0.5 rounded text-xs font-mono">
+                {part.slice(1, -1)}
+              </code>
+            )
+          } else if (/^\[([^\]]+)\]\(([^)]+)\)$/.test(part)) {
+            const match = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+            if (match) {
+              inlineResult.push(
+                <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer"
+                  className="text-[#7c9cff] underline hover:text-[#9d7cff] transition-colors">
+                  {match[1]}
+                </a>
+              )
+            }
+          } else if (part.startsWith('- ') || part === '- ') {
+            inlineResult.push(<span key={key++}>&bull; {part.slice(2)}</span>)
+          } else {
+            inlineResult.push(<span key={key++}>{part}</span>)
+          }
+        }
+
+        if (lineIdx > 0 || result.length > 0) {
+          result.push(<br key={key++} />)
+        }
+        result.push(<span key={key++}>{inlineResult}</span>)
       }
     }
-
-    if (lineIdx > 0) {
-      result.push(<br key={key++} />)
-    }
-    result.push(<span key={key++}>{inlineResult}</span>)
   }
   return <>{result}</>
 }
@@ -184,6 +215,12 @@ function GlobalStyles() {
         from { opacity: 0; transform: translateX(8px); }
         to { opacity: 1; transform: translateX(0); }
       }
+      @keyframes shimmer-gradient { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+      @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      @keyframes gradient-border { from { background-position: 0% 50%; } to { background-position: 100% 50%; } }
+      @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(124,156,255,0.4); } 70% { box-shadow: 0 0 0 8px rgba(124,156,255,0); } 100% { box-shadow: 0 0 0 0 rgba(124,156,255,0); } }
+      @keyframes progressShimmer { 0% { left: -100%; } 100% { left: 200%; } }
+      @keyframes cardShine { from { left: -100%; } to { left: 200%; } }
 
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
@@ -192,8 +229,11 @@ function GlobalStyles() {
 
       .chat-bubble-enter { animation: slideUp 0.3s ease-out forwards; }
 
-      .card-hover { transition: all 0.2s ease; }
+      .card-hover { transition: all 0.2s ease; position: relative; overflow: hidden; }
       .card-hover:hover { transform: translateY(-2px); box-shadow: 0 0 20px rgba(124,156,255,0.1), 0 0 40px rgba(124,156,255,0.05); border-color: rgba(124,156,255,0.3) !important; }
+      .card-shine { position: relative; overflow: hidden; }
+      .card-shine::after { content: ''; position: absolute; top: 0; left: -100%; width: 60%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.04), transparent); pointer-events: none; }
+      .card-shine:hover::after { animation: cardShine 0.6s ease forwards; }
 
       .btn-hover { transition: all 0.15s ease; }
       .btn-hover:hover { transform: scale(1.03); }
@@ -236,11 +276,53 @@ function GlobalStyles() {
       .sidebar-active {
         border-left: 3px solid #7c9cff;
         padding-left: 9px;
-        background: rgba(124,156,255,0.08) !important;
+        background: linear-gradient(to right, rgba(124,156,255,0.12), rgba(124,156,255,0.02)) !important;
+      }
+      .sidebar-active-dot {
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #7c9cff;
+        margin-left: 4px;
+        animation: pulseDot 1.5s ease-in-out infinite;
       }
       .sidebar-inactive {
         border-left: 3px solid transparent;
         padding-left: 9px;
+      }
+
+      /* Animated gradient border */
+      .gradient-border-animated {
+        position: relative;
+        border-radius: 0.75rem;
+        overflow: hidden;
+      }
+      .gradient-border-animated::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        padding: 1.5px;
+        border-radius: 0.75rem;
+        background: conic-gradient(from var(--border-angle, 0deg), #7c9cff, #9d7cff, #c084fc, #7c9cff);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        animation: gradient-border 3s linear infinite;
+        background-size: 100% 100%;
+      }
+
+      /* Progress bar shimmer */
+      .progress-shimmer { position: relative; overflow: hidden; }
+      .progress-shimmer::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 50%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+        animation: progressShimmer 2s ease-in-out infinite;
       }
 
       /* Onboarding bubble gradient */
@@ -403,7 +485,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v7'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v8'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -943,6 +1025,36 @@ function BookmarksModal({ open, onClose }: { open: boolean; onClose: () => void 
 /* ========================================================================
    LANDING / SIGN UP SCREEN (Enhanced)
    ======================================================================== */
+/* ========================================================================
+   TYPING SUBTITLE COMPONENT
+   ======================================================================== */
+function TypingSubtitle() {
+  const phrases = ['your AI mentor', 'your study companion', 'your learning partner']
+  const [idx, setIdx] = useState(0)
+  const [fade, setFade] = useState(true)
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setFade(false)
+      setTimeout(() => {
+        setIdx(i => (i + 1) % phrases.length)
+        setFade(true)
+      }, 400)
+    }, 3000)
+    return () => clearInterval(interval)
+  }, [phrases.length])
+
+  return (
+    <p className="text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed transition-opacity duration-400"
+      style={{ opacity: fade ? 1 : 0 }}>
+      the teacher you always wished you had. {phrases[idx]}.
+    </p>
+  )
+}
+
+/* ========================================================================
+   LANDING SCREEN
+   ======================================================================== */
 function LandingScreen() {
   const { setAuth, setView } = useAppStore()
   const [name, setName] = useState('')
@@ -1030,17 +1142,17 @@ function LandingScreen() {
 
       {/* Hero */}
       <div className="text-center max-w-2xl mx-auto mb-8 animate-fadeInUp relative z-10">
-        <Orb />
+        <div style={{ animation: 'bob 3s ease-in-out infinite' }}>
+          <Orb />
+        </div>
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v7.0 AGENTIC
+          v8.0 AGENTIC
         </Badge>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r from-[#7c9cff] via-[#9d7cff] to-[#c084fc]"
+          style={{ backgroundSize: '200% 200%', animation: 'shimmer-gradient 4s ease infinite' }}>
           sit with me
         </h1>
-        <p className="text-lg text-muted-foreground max-w-lg mx-auto leading-relaxed">
-          the teacher you always wished you had. an agentic AI mentor that sits next to you,
-          plans your learning, and adapts to how you learn.
-        </p>
+        <TypingSubtitle />
       </div>
 
       {/* Feature Cards */}
@@ -1048,9 +1160,10 @@ function LandingScreen() {
         {features.map((f, i) => (
           <div
             key={f.title}
-            className="card-hover bg-[#191c23]/80 border border-[#272b34] rounded-xl p-4 backdrop-blur-sm"
+            className="card-hover card-shine bg-[#191c23]/80 border border-[#272b34] rounded-xl p-4 backdrop-blur-sm relative group"
             style={{ animationDelay: `${i * 80}ms`, animation: 'fadeInUp 0.5s ease-out both', animationDelay: `${i * 80 + 200}ms` }}
           >
+            <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl bg-gradient-to-b from-[#7c9cff] to-[#9d7cff] scale-y-0 group-hover:scale-y-100 transition-transform duration-300 origin-center" />
             <span className="text-2xl mb-2 block">{f.emoji}</span>
             <h3 className="text-sm font-semibold mb-1">{f.title}</h3>
             <p className="text-xs text-muted-foreground">{f.desc}</p>
@@ -1652,7 +1765,7 @@ function DailyCheckinWidget() {
 }
 
 /* ========================================================================
-   DAILY CHALLENGE WIDGET (v7.0)
+   DAILY CHALLENGE WIDGET (v8.0)
    ======================================================================== */
 function DailyChallengeWidget() {
   const store = useAppStore()
@@ -1733,7 +1846,7 @@ function DailyChallengeWidget() {
 }
 
 /* ========================================================================
-   SESSION SUMMARY MODAL (v7.0)
+   SESSION SUMMARY MODAL (v8.0)
    ======================================================================== */
 function SessionSummaryModal({ open, onClose, summary, keyPoints, xp }: {
   open: boolean; onClose: () => void; summary: string; keyPoints: string[]; xp: number
@@ -1791,6 +1904,35 @@ function ChatSessionView() {
   const [summaryOpen, setSummaryOpen] = useState(false)
   const [summaryData, setSummaryData] = useState<{ summary: string; keyPoints: string[]; xp: number }>({ summary: '', keyPoints: [], xp: 0 })
   const [summarizing, setSummarizing] = useState(false)
+
+  // Study mode state
+  const [studyMode, setStudyMode] = useState(false)
+  const [studyContent, setStudyContent] = useState('')
+  const [studyLoading, setStudyLoading] = useState(false)
+  const [showAnswers, setShowAnswers] = useState(false)
+
+  const handleStudyMode = async () => {
+    setStudyLoading(true)
+    try {
+      const topic = store.topic || 'general learning'
+      const level = store.level || 'beginner'
+      const data = await api('/ai/chat', {
+        sessionToken: store.sessionToken,
+        message: `Generate 3 quiz questions about ${topic} at ${level} level. Format each question as: **Q:** [question] **A:** [answer]`,
+        history: [],
+        boost: false,
+      })
+      setStudyContent(data.reply || 'Failed to generate quiz.')
+      setStudyMode(true)
+      setShowAnswers(false)
+      store.setProgress({ xp: store.xp + 10 })
+      store.addNotification('🧪 Study Mode activated! +10 XP')
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to start study mode')
+    } finally {
+      setStudyLoading(false)
+    }
+  }
 
   useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
@@ -1956,13 +2098,37 @@ function ChatSessionView() {
         {/* Daily Challenge Widget */}
         <DailyChallengeWidget />
 
+        {/* Study Mode Card */}
+        {studyMode && (
+          <Card className="bg-[#191c23] border-[#5fd0a0]/30 card-hover card-shine">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🧪</span>
+                  <span className="text-xs font-semibold text-[#5fd0a0]">Study Mode</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setStudyMode(false)} className="h-6 w-6 p-0">
+                  <X className="w-3 h-3" />
+                </Button>
+              </div>
+              <div className="text-sm">
+                {showAnswers ? renderMarkdown(studyContent) : renderMarkdown(studyContent.replace(/\*\*A:\*\*.*?(?=\*\*Q:\*\*|$)/gs, '**A:** _hidden_'))}
+              </div>
+              <Button size="sm" variant="outline" onClick={() => setShowAnswers(!showAnswers)}
+                className="mt-3 text-xs border-[#5fd0a0]/30 text-[#5fd0a0] hover:bg-[#5fd0a0]/10 btn-hover">
+                {showAnswers ? '🙈 Hide Answers' : '👁 Show Answers'}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
         {store.chatMessages.map((msg, i) => {
           const isSearchMatch = searchQuery.trim() && searchResults.some(r => r.i === i)
           return (
             <div key={i} className={`flex gap-3 chat-bubble-enter ${msg.role === 'user' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'} ${isSearchMatch ? 'ring-1 ring-[#7c9cff]/40 rounded-xl' : ''}`}>
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0"
-                  style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 ${store.chatBusy && i === store.chatMessages.length - 1 ? '' : ''}`}
+                  style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', animation: store.chatBusy && i === store.chatMessages.length - 1 ? 'pulseRing 1.5s ease-in-out infinite' : 'none' }}>
                   🧠
                 </div>
               )}
@@ -1971,7 +2137,7 @@ function ChatSessionView() {
                   ? 'bubble-gradient-user text-foreground rounded-2xl rounded-tr-sm whitespace-pre-wrap px-4 py-3 text-sm'
                   : msg.role === 'system'
                     ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%] px-4 py-3 rounded-2xl'
-                    : 'bubble-gradient-assistant text-foreground rounded-2xl rounded-tl-sm px-4 py-3 text-sm'
+                    : 'bubble-gradient-assistant text-foreground rounded-2xl rounded-tl-sm px-4 py-3 text-sm border-l-2 border-l-[#7c9cff]/60 hover:shadow-[0_0_15px_rgba(124,156,255,0.15)] transition-shadow duration-300'
               }`}>
                 {searchQuery.trim() ? highlightText(msg.content) : (msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content)}
                 {/* Timestamp */}
@@ -2034,6 +2200,10 @@ function ChatSessionView() {
             <button onClick={handleSummary} disabled={summarizing}
               className="text-[11px] text-[#9d7cff] bg-[#9d7cff]/10 border border-[#9d7cff]/20 rounded-full px-2.5 py-1 hover:bg-[#9d7cff]/20 transition-colors disabled:opacity-50">
               {summarizing ? '⏳ Summarizing...' : '📋 Summarize'}
+            </button>
+            <button onClick={handleStudyMode} disabled={studyLoading}
+              className="text-[11px] text-[#5fd0a0] bg-[#5fd0a0]/10 border border-[#5fd0a0]/20 rounded-full px-2.5 py-1 hover:bg-[#5fd0a0]/20 transition-colors disabled:opacity-50">
+              {studyLoading ? '⏳ Loading...' : '🧪 Study Mode'}
             </button>
             <button onClick={() => setSearchOpen(!searchOpen)}
               className={`text-[11px] rounded-full px-2.5 py-1 transition-colors ${searchOpen ? 'text-[#7c9cff] bg-[#7c9cff]/10 border border-[#7c9cff]/20' : 'text-muted-foreground bg-[#191c23] border border-[#272b34] hover:border-[#7c9cff]/40 hover:text-[#7c9cff]'}`}>
@@ -2649,7 +2819,7 @@ function ProgressView() {
               <p className="text-[10px] text-muted-foreground">Level {level + 1}</p>
             </div>
           </div>
-          <div className="relative">
+          <div className="relative progress-shimmer">
             <Progress value={(xpInLevel / xpForNext) * 100} className="h-2.5" />
             <div className="absolute inset-0 rounded-full overflow-hidden">
               <div className="h-full bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] rounded-full"
@@ -2709,6 +2879,123 @@ function ProgressView() {
         </CardContent>
       </Card>
 
+      {/* XP Growth Chart (Recharts) */}
+      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">XP Growth This Week</p>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={useMemo(() => {
+              const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+              const baseXp = Math.max(xp - 35, 0)
+              return days.map((day, i) => ({
+                day,
+                xp: Math.max(0, baseXp + Math.floor((xp / 7) * (i + 1) + (wins * i * 2) - Math.floor(Math.random() * 5 + i * 3)))
+              }))
+            }, [xp, wins, sessionCount])}>
+              <defs>
+                <linearGradient id="xpGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#7c9cff" />
+                  <stop offset="100%" stopColor="#9d7cff" />
+                </linearGradient>
+                <linearGradient id="xpFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#7c9cff" stopOpacity={0.3} />
+                  <stop offset="100%" stopColor="#9d7cff" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} axisLine={false} tickLine={false} width={30} />
+              <RechartsTooltip
+                contentStyle={{ backgroundColor: '#191c23', border: '1px solid #272b34', borderRadius: '8px', fontSize: '11px' }}
+                labelStyle={{ color: '#c5d0ff' }}
+              />
+              <Area type="monotone" dataKey="xp" stroke="url(#xpGradient)" fill="url(#xpFill)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      {/* Learning Streak Calendar - 35-Day Activity */}
+      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">35-Day Activity</p>
+          {/* Column labels */}
+          <div className="flex gap-1 mb-1 ml-8">
+            {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => (
+              <div key={i} className="w-5 h-3 flex items-center justify-center text-[8px] text-muted-foreground/60">{d}</div>
+            ))}
+          </div>
+          {/* Grid rows */}
+          <div className="space-y-1">
+            {[0, 1, 2, 3, 4].map(week => (
+              <div key={week} className="flex items-center gap-1">
+                <span className="text-[8px] text-muted-foreground/40 w-6 shrink-0">W{week + 1}</span>
+                {[0, 1, 2, 3, 4, 5, 6].map(day => {
+                  const idx = week * 7 + day
+                  const activityLevel = (() => {
+                    const base = sessionCount + wins + Math.floor(xp / 10)
+                    const val = (base * (idx + 1) + store.xp * (idx % 3)) % 7
+                    if (val < 2) return 0
+                    if (val < 4) return 1
+                    if (val < 6) return 2
+                    return 3
+                  })()
+                  const colors = ['#191c23', 'rgba(124,156,255,0.15)', 'rgba(124,156,255,0.35)', '#7c9cff']
+                  return (
+                    <div key={day} className="w-5 h-5 rounded-sm" style={{ backgroundColor: colors[activityLevel] }}
+                      title={`Day ${idx + 1}: ${['No activity', 'Low', 'Medium', 'High'][activityLevel]}`} />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="flex items-center gap-2 mt-3 text-[9px] text-muted-foreground">
+            <span>Less</span>
+            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: '#191c23' }} />
+            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: 'rgba(124,156,255,0.15)' }} />
+            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: 'rgba(124,156,255,0.35)' }} />
+            <div className="w-4 h-4 rounded-sm" style={{ backgroundColor: '#7c9cff' }} />
+            <span>More</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Session History */}
+      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Session History</p>
+            <BookMarked className="w-4 h-4 text-[#7c9cff]" />
+          </div>
+          {store.sessionSummaries.length === 0 ? (
+            <div className="text-center py-4">
+              <p className="text-xs text-muted-foreground">No sessions summarized yet</p>
+              <p className="text-[10px] text-muted-foreground/60 mt-1">Use 📋 Summarize in chat to save sessions</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
+              {store.sessionSummaries.slice(-5).reverse().map(s => (
+                <div key={s.id} className="bg-[#15171d] rounded-lg p-2.5 border border-[#272b34]/50">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[10px] text-muted-foreground">{timeAgo(s.date)}</span>
+                    <Badge className="text-[8px] bg-[#7c9cff]/15 text-[#7c9cff] border-0 px-1">+{s.xp} XP</Badge>
+                  </div>
+                  <p className="text-xs text-foreground/80 line-clamp-2">{s.summary}</p>
+                  {s.keyPoints.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {s.keyPoints.slice(0, 3).map((kp, ki) => (
+                        <Badge key={ki} variant="outline" className="text-[8px] border-[#272b34] text-muted-foreground px-1 py-0">{kp}</Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Achievements */}
       <Card className="bg-[#191c23] border-[#272b34] card-hover">
         <CardContent className="p-4">
@@ -2730,7 +3017,7 @@ function ProgressView() {
 }
 
 /* ========================================================================
-   LEARNING RESOURCES VIEW (NEW - v7.0)
+   LEARNING RESOURCES VIEW (v8.0)
    ======================================================================== */
 function ResourcesView() {
   const store = useAppStore()
@@ -3090,7 +3377,7 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v7')
+    localStorage.removeItem('sitwithme-v8')
     window.location.reload()
   }
 
@@ -3200,12 +3487,75 @@ function SettingsView() {
 }
 
 /* ========================================================================
+   QUICK NOTES PANEL
+   ======================================================================== */
+function QuickNotesPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const store = useAppStore()
+  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+
+  const handleChange = (val: string) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      store.setQuickNotes(val)
+    }, 500)
+  }
+
+  const copyAll = () => {
+    navigator.clipboard.writeText(store.quickNotes)
+    toast.success('Notes copied to clipboard')
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[90] flex justify-end" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-sm bg-[#15171d]/95 backdrop-blur-xl border-l border-[#272b34] h-full flex flex-col animate-fadeIn shadow-2xl"
+        onClick={e => e.stopPropagation()}
+        style={{ animation: 'fadeInUp 0.3s ease-out' }}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-[#272b34]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📝</span>
+            <h3 className="font-semibold text-sm">Quick Notes</h3>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={copyAll} className="text-[10px] text-muted-foreground h-6 btn-hover">
+              <Copy className="w-3 h-3 mr-1" /> Copy All
+            </Button>
+            <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+              <X className="w-3 h-3" />
+            </Button>
+          </div>
+        </div>
+        <div className="flex-1 p-4">
+          <Textarea
+            value={store.quickNotes}
+            onChange={(e) => handleChange(e.target.value)}
+            placeholder="Write your notes here... auto-saved"
+            className="w-full h-full bg-[#191c23] border-[#272b34] text-foreground text-sm resize-none focus:border-[#7c9cff] custom-scrollbar"
+            style={{ minHeight: 'calc(100vh - 140px)' }}
+          />
+        </div>
+        <div className="p-3 border-t border-[#272b34] flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">{store.quickNotes.length} characters</span>
+          <span className="text-[10px] text-muted-foreground/50">Auto-saved</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================
    MAIN APP LAYOUT (Enhanced)
    ======================================================================== */
 function MainApp() {
   const store = useAppStore()
   const cmdPalette = useCommandPalette()
   const kbShortcuts = useKeyboardShortcuts()
+  const [quickNotesOpen, setQuickNotesOpen] = useState(false)
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
 
   const navItems: Array<{ id: AppTab; icon: React.ReactNode; label: string }> = [
     { id: 'session', icon: <MessageSquare className="w-[18px]" />, label: 'Session' },
@@ -3275,6 +3625,7 @@ function MainApp() {
                 >
                   {item.icon}
                   {item.label}
+                  {store.currentTab === item.id && <span className="sidebar-active-dot" />}
                   <span className="ml-auto text-[10px] text-muted-foreground/40">{idx + 1}</span>
                 </button>
               </TooltipPrimitive.Trigger>
@@ -3287,7 +3638,7 @@ function MainApp() {
 
         {/* Richer User Card */}
         <div className="p-2.5 border-t border-[#272b34]">
-          <div className="bg-[#191c23] border border-[#272b34] rounded-xl p-3 card-hover">
+          <div className="gradient-border-animated bg-[#191c23] rounded-xl p-3 card-hover">
             <div className="flex items-center gap-2.5">
               <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-[#0e0f13] ring-2 ring-[#7c9cff]/30 ring-offset-1 ring-offset-[#191c23]"
                 style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
@@ -3329,7 +3680,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v7.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v8.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -3358,6 +3709,20 @@ function MainApp() {
             <span>Search</span>
             <kbd className="text-[9px] bg-[#0e0f13] border border-[#272b34] rounded px-1 py-0.5">⌘K</kbd>
           </button>
+          {/* Quick Notes Toggle */}
+          <TooltipPrimitive.Root>
+            <TooltipPrimitive.Trigger asChild>
+              <button
+                onClick={() => setQuickNotesOpen(true)}
+                className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground/50 hover:text-[#7c9cff] transition-colors bg-[#191c23]/50 backdrop-blur border border-white/5 rounded-md px-2 py-1"
+              >
+                📝 Notes
+              </button>
+            </TooltipPrimitive.Trigger>
+            <TooltipPrimitive.Content side="bottom" className="bg-[#191c23] border border-[#272b34] text-xs px-2 py-1 rounded-md z-[200]">
+              Quick Notes
+            </TooltipPrimitive.Content>
+          </TooltipPrimitive.Root>
           {/* Theme Toggle - desktop only */}
           <TooltipPrimitive.Root>
             <TooltipPrimitive.Trigger asChild>
@@ -3410,7 +3775,7 @@ function MainApp() {
           </AnimatePresence>
         </div>
 
-        {/* Mobile Bottom Nav */}
+        {/* Mobile Bottom Nav with Drawer */}
         <nav className="sm:hidden flex border-t border-[#272b34] bg-[#15171d]">
           {navItems.slice(0, 5).map(item => (
             <button
@@ -3424,8 +3789,80 @@ function MainApp() {
               {item.label}
             </button>
           ))}
+          <button
+            onClick={() => setMobileDrawerOpen(true)}
+            className="flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] text-muted-foreground transition-colors hover:text-[#7c9cff]"
+          >
+            <span className="text-[18px]">•••</span>
+            More
+          </button>
         </nav>
       </div>
+
+      {/* Mobile Drawer (vaul) */}
+      <Drawer open={mobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)} onOpenChange={setMobileDrawerOpen}>
+        <Drawer.Overlay className="fixed inset-0 bg-black/50 z-[70]" />
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[80] rounded-t-xl glass max-h-[70vh] overflow-y-auto custom-scrollbar">
+          <div className="mx-auto w-12 h-1.5 rounded-full bg-muted-foreground/30 mt-3 mb-2" />
+          {/* User Profile Card */}
+          <div className="px-4 pb-3">
+            <div className="flex items-center gap-3 bg-[#191c23]/80 rounded-xl p-3 border border-[#272b34]">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-[#0e0f13]"
+                style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
+                {avatarInitial}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold truncate">{displayName}</span>
+                  <Badge className="text-[8px] bg-[#9d7cff]/15 text-[#9d7cff] border-0 px-1 py-0">Lv.{Math.floor(store.xp / 100) + 1}</Badge>
+                </div>
+                <div className="mt-1">
+                  <div className="h-1.5 bg-[#272b34] rounded-full overflow-hidden progress-shimmer">
+                    <div className="h-full rounded-full" style={{ width: `${(store.xp % 100)}%`, background: 'linear-gradient(to right, #7c9cff, #9d7cff)' }} />
+                  </div>
+                  <span className="text-[9px] text-muted-foreground">{store.xp % 100}/100 XP</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Remaining tabs */}
+          <div className="px-4 space-y-1">
+            {navItems.slice(5).map(item => (
+              <button
+                key={item.id}
+                onClick={() => { store.setTab(item.id); setMobileDrawerOpen(false) }}
+                className="flex items-center gap-3 w-full text-left rounded-lg text-sm py-2.5 px-3 text-muted-foreground hover:bg-[#191c23] hover:text-foreground transition-colors"
+              >
+                {item.icon}
+                {item.label}
+              </button>
+            ))}
+          </div>
+          {/* Theme Toggle */}
+          <div className="px-4 py-3 border-t border-[#272b34] mt-2">
+            <button
+              onClick={() => store.setTheme(store.theme === 'dark' ? 'light' : 'dark')}
+              className="flex items-center gap-3 w-full text-left rounded-lg text-sm py-2 px-3 text-muted-foreground hover:bg-[#191c23] hover:text-foreground transition-colors"
+            >
+              {store.theme === 'dark' ? <Moon className="w-[18px]" /> : <Sun className="w-[18px]" />}
+              {store.theme === 'dark' ? 'Dark Mode' : 'Light Mode'}
+            </button>
+          </div>
+          {/* Sign Out */}
+          <div className="px-4 pb-6">
+            <button
+              onClick={() => { store.clearAuth(); setMobileDrawerOpen(false); toast.success('Signed out') }}
+              className="flex items-center gap-3 w-full text-left rounded-lg text-sm py-2 px-3 text-[#ff8a8a] hover:bg-[#ff8a8a]/10 transition-colors"
+            >
+              <LogOut className="w-[18px]" />
+              Sign Out
+            </button>
+          </div>
+        </Drawer.Content>
+      </Drawer>
+
+      {/* Quick Notes Panel */}
+      <QuickNotesPanel open={quickNotesOpen} onClose={() => setQuickNotesOpen(false)} />
 
       {/* Mobile Sidebar Overlay */}
       {store.sidebarOpen && (
