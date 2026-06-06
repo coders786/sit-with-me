@@ -104,6 +104,20 @@ export interface MessageReaction {
   reaction: '👍' | '👎' | '💡' | '📌'
 }
 
+export interface QuickNote {
+  id: string
+  text: string
+  createdAt: number
+  pinned: boolean
+}
+
+export interface QuickNote {
+  id: string
+  text: string
+  createdAt: number
+  pinned: boolean
+}
+
 interface AppState {
   // Navigation
   currentView: AppView
@@ -209,9 +223,15 @@ interface AppState {
   setDailyChallenge: (challenge: DailyChallenge | null) => void
   completeDailyChallenge: () => void
 
-  // Quick Notes
+  // Quick Notes (legacy string)
   quickNotes: string
   setQuickNotes: (notes: string) => void
+
+  // Quick Notes (enhanced array)
+  quickNotesList: QuickNote[]
+  addQuickNote: (text: string) => void
+  removeQuickNote: (id: string) => void
+  togglePinNote: (id: string) => void
 
   // Review Cards (Spaced Repetition)
   reviewCards: ReviewCard[]
@@ -429,6 +449,18 @@ export const useAppStore = create<AppState>()(
       quickNotes: '',
       setQuickNotes: (notes) => set({ quickNotes: notes }),
 
+      // Quick Notes (enhanced array)
+      quickNotesList: [],
+      addQuickNote: (text) => set((s) => ({
+        quickNotesList: [...s.quickNotesList, { id: Date.now().toString() + Math.random().toString(36).slice(2), text, createdAt: Date.now(), pinned: false }],
+      })),
+      removeQuickNote: (id) => set((s) => ({
+        quickNotesList: s.quickNotesList.filter(n => n.id !== id),
+      })),
+      togglePinNote: (id) => set((s) => ({
+        quickNotesList: s.quickNotesList.map(n => n.id === id ? { ...n, pinned: !n.pinned } : n),
+      })),
+
       // Review Cards
       reviewCards: [],
       addReviewCard: (card) => set((s) => ({
@@ -511,7 +543,7 @@ export const useAppStore = create<AppState>()(
         pomodoroState: { running: false, timeLeft: 25 * 60, sessionsCompleted: 0, mode: 'work' as const },
         learningResources: [], bookmarkedMessages: [], focusMode: false,
         confettiActive: false, currentView: 'landing',
-        sessionSummaries: [], dailyChallenge: null, quickNotes: '',
+        sessionSummaries: [], dailyChallenge: null, quickNotes: '', quickNotesList: [],
         reviewCards: [], moodLogs: [], messageReactions: [],
         sessionStartTime: null,
         dailyReviewReminders: true, autoGenerateFlashcards: false, defaultSessionDuration: 25 as const,
@@ -586,7 +618,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v10',
+      name: 'sitwithme-v11',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -645,6 +677,7 @@ export const useAppStore = create<AppState>()(
         learningStreakCalendar: state.learningStreakCalendar,
         motivationalQuote: state.motivationalQuote,
         pomodoroSound: state.pomodoroSound,
+        quickNotesList: state.quickNotesList,
       }),
     }
   )

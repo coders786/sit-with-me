@@ -30,6 +30,7 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsToolti
 import { Drawer as VaulDrawer } from 'vaul'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { io as socketIo, Socket } from 'socket.io-client'
 
 /* ========================================================================
    API Helper
@@ -303,6 +304,8 @@ function GlobalStyles() {
       @keyframes slideInRight { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
       @keyframes numberGlow { 0%, 100% { text-shadow: 0 0 8px rgba(124,156,255,0.3); } 50% { text-shadow: 0 0 16px rgba(124,156,255,0.6); } }
       @keyframes circularStroke { from { stroke-dashoffset: 283; } to { stroke-dashoffset: 0; } }
+      @keyframes staggerFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes gentleBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
 
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
@@ -314,6 +317,13 @@ function GlobalStyles() {
       .animate-numberGlow { animation: numberGlow 2s ease-in-out infinite; }
       .animate-pulseSpeaking { animation: pulseSpeaking 1s ease-in-out infinite; }
       .animate-slideInRight { animation: slideInRight 0.3s ease-out forwards; }
+      .animate-gentleBob { animation: gentleBob 3s ease-in-out infinite; }
+
+      /* Staggered card entrance */
+      .stagger-card { opacity: 0; animation: staggerFadeIn 0.4s ease-out forwards; }
+
+      /* Gradient section divider */
+      .gradient-divider { height: 2px; background: linear-gradient(to right, transparent, #7c9cff40, #9d7cff40, transparent); border: none; margin: 16px 0; }
 
       /* Gradient mesh background for landing */
       .mesh-bg {
@@ -799,7 +809,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'export-data', label: 'Export Data', icon: <Download className="w-4 h-4" />, desc: 'Download all data as JSON', action: () => {
       const state = useAppStore.getState()
       const data = {
-        exportDate: new Date().toISOString(), version: '10.0',
+        exportDate: new Date().toISOString(), version: '11.0',
         profile: state.profile, topic: state.topic, vision: state.vision,
         tasks: state.tasks, reviewCards: state.reviewCards, moodLogs: state.moodLogs,
         chatMessages: state.chatMessages, quickNotes: state.quickNotes,
@@ -820,7 +830,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v10'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v11'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -1617,7 +1627,7 @@ function LandingScreen() {
           <Orb />
         </div>
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v10.0 AGENTIC
+          v11.0 AGENTIC
         </Badge>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 gradient-text">
           sit with me
@@ -2768,6 +2778,34 @@ function ChatSessionView() {
 
       // Award XP for chatting
       store.setProgress({ xp: store.xp + 5 })
+
+      // Auto-flashcard generation
+      if (store.autoGenerateFlashcards && data.reply.length > 100) {
+        fetch('/api/ai/flashcard', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionToken: store.sessionToken, content: data.reply }),
+        })
+          .then(res => res.json())
+          .then((flashData: { cards?: Array<{ front: string; back: string }> }) => {
+            if (flashData.cards && flashData.cards.length > 0) {
+              flashData.cards.forEach(card => {
+                store.addReviewCard({
+                  id: Date.now().toString() + Math.random().toString(36).slice(2),
+                  front: card.front,
+                  back: card.back,
+                  interval: 1,
+                  nextReview: Date.now(),
+                  easeFactor: 2.5,
+                  repetitions: 0,
+                })
+              })
+              toast.success(`📝 ${flashData.cards.length} flashcard${flashData.cards.length > 1 ? 's' : ''} generated`)
+              store.addNotification(`📝 ${flashData.cards.length} flashcard${flashData.cards.length > 1 ? 's' : ''} auto-generated from chat`)
+            }
+          })
+          .catch(() => { /* ignore flashcard errors */ })
+      }
     } catch (err: unknown) {
       store.addChatMessage({
         role: 'system',
@@ -2930,9 +2968,15 @@ function ChatSessionView() {
           return (
             <div key={i} className={`flex gap-3 chat-bubble-enter ${msg.role === 'user' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'} ${isSearchMatch ? 'ring-1 ring-[#7c9cff]/40 rounded-xl' : ''}`}>
               {msg.role === 'assistant' && (
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 ${store.chatBusy && i === store.chatMessages.length - 1 ? '' : ''}`}
-                  style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', animation: store.chatBusy && i === store.chatMessages.length - 1 ? 'pulseRing 1.5s ease-in-out infinite' : 'none' }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', boxShadow: store.chatBusy && i === store.chatMessages.length - 1 ? '0 0 12px rgba(124,156,255,0.4)' : 'none', animation: store.chatBusy && i === store.chatMessages.length - 1 ? 'pulseRing 1.5s ease-in-out infinite' : 'none' }}>
                   🧠
+                </div>
+              )}
+              {msg.role === 'user' && (
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-[#0e0f13] shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
+                  {(store.userName || 'U').charAt(0).toUpperCase()}
                 </div>
               )}
               <div className="flex flex-col max-w-[78%]">
@@ -3176,13 +3220,13 @@ function PlanView() {
       {!plan && !loading && !store.planWeek && (
         <Card className="bg-[#191c23] border-[#272b34] card-hover mt-6">
           <CardContent className="p-12 text-center">
-            <span className="text-6xl mb-4 block">📅</span>
-            <h3 className="font-semibold text-lg mb-2">No plan yet</h3>
-            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+            <span className="text-6xl mb-4 block animate-gentleBob">📅</span>
+            <h3 className="font-semibold text-lg mb-2 gradient-text">No plan yet</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
               Generate a personalized 7-day learning plan tailored to your goals and schedule. Your AI mentor will create daily focus areas and actionable steps.
             </p>
             <Button onClick={generatePlan}
-              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
+              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover px-8">
               <Zap className="w-4 h-4 mr-2" /> Generate Plan
             </Button>
           </CardContent>
@@ -3210,7 +3254,7 @@ function PlanView() {
             const dayStatus = store.planDayProgress[i + 1] || 'not-started'
             const isCompleted = dayStatus === 'completed'
             return (
-              <Card key={i} className={`bg-[#191c23] border-[#272b34] overflow-hidden card-hover transition-opacity ${isCompleted ? 'opacity-70' : ''}`}>
+              <Card key={i} className={`bg-[#191c23] border-[#272b34] overflow-hidden card-hover transition-opacity stagger-card ${isCompleted ? 'opacity-70' : ''}`} style={{ animationDelay: `${i * 0.08}s` }}>
                 <div className="flex">
                   {/* Left accent border */}
                   <div className={`w-1.5 shrink-0 bg-gradient-to-b ${accentColors[i % accentColors.length]}`} />
@@ -3448,8 +3492,8 @@ function TasksView() {
       {pending.length > 0 && (
         <div className="space-y-2 mb-6">
           <h3 className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Active Tasks</h3>
-          {pending.map(task => (
-            <Card key={task.id} className="bg-[#191c23] border-[#272b34] card-hover">
+          {pending.map((task, idx) => (
+            <Card key={task.id} className="bg-[#191c23] border-[#272b34] card-hover stagger-card" style={{ animationDelay: `${idx * 0.06}s` }}>
               <CardContent className="p-3 flex items-center gap-3">
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-muted-foreground hover:text-[#5fd0a0] btn-hover"
                   onClick={() => completeTask(task.id)}>
@@ -3495,13 +3539,13 @@ function TasksView() {
       {pending.length === 0 && completed.length === 0 && (
         <Card className="bg-[#191c23] border-[#272b34] card-hover">
           <CardContent className="p-12 text-center">
-            <span className="text-6xl mb-4 block">📋</span>
-            <h3 className="font-semibold text-lg mb-2">No tasks yet</h3>
-            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+            <span className="text-6xl mb-4 block animate-gentleBob">📋</span>
+            <h3 className="font-semibold text-lg mb-2 gradient-text">No tasks yet</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
               Chat with your mentor and tasks will be auto-created, or generate a plan to get started with actionable steps.
             </p>
             <Button onClick={() => store.setTab('session')}
-              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
+              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover px-8">
               <MessageSquare className="w-4 h-4 mr-2" /> Start Chatting
             </Button>
           </CardContent>
@@ -4021,13 +4065,13 @@ function ResourcesView() {
       {!loading && store.learningResources.length === 0 && (
         <Card className="bg-[#191c23] border-[#272b34] card-hover">
           <CardContent className="p-12 text-center">
-            <span className="text-6xl mb-4 block">📚</span>
-            <h3 className="font-semibold text-lg mb-2">No resources yet</h3>
-            <p className="text-sm text-muted-foreground mb-4 max-w-md mx-auto">
+            <span className="text-6xl mb-4 block animate-gentleBob">📚</span>
+            <h3 className="font-semibold text-lg mb-2 gradient-text">No resources yet</h3>
+            <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
               Let your AI mentor find the best videos, articles, podcasts, and interactive tools for your learning journey.
             </p>
             <Button onClick={fetchResources}
-              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
+              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover px-8">
               <BookOpen className="w-4 h-4 mr-2" /> Discover Resources
             </Button>
           </CardContent>
@@ -4037,8 +4081,8 @@ function ResourcesView() {
       {/* Resource Cards Grid */}
       {!loading && filtered.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {filtered.map((r) => (
-            <Card key={r.id} className="bg-[#191c23] border-[#272b34] card-hover overflow-hidden">
+          {filtered.map((r, idx) => (
+            <Card key={r.id} className="bg-[#191c23] border-[#272b34] card-hover overflow-hidden stagger-card" style={{ animationDelay: `${idx * 0.08}s` }}>
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">
                   <span className="text-2xl shrink-0">{typeIcons[r.type] || '📖'}</span>
@@ -4268,17 +4312,17 @@ function ReviewView() {
         </div>
       ) : (
         <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(124,156,255,0.1), rgba(157,124,255,0.1))' }}>
+          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center animate-gentleBob" style={{ background: 'linear-gradient(135deg, rgba(124,156,255,0.1), rgba(157,124,255,0.1))' }}>
             <span className="text-4xl">🃏</span>
           </div>
-          <h3 className="text-lg font-semibold mb-2">No cards to review</h3>
+          <h3 className="text-lg font-semibold mb-2 gradient-text">No cards to review</h3>
           <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
             {allCards.length === 0
               ? 'Create flashcards to start your spaced repetition practice.'
               : 'All cards are reviewed! Come back when they\'re due.'}
           </p>
           {allCards.length === 0 && (
-            <Button onClick={addSampleCards} className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] btn-hover">
+            <Button onClick={addSampleCards} className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] btn-hover px-8">
               <Plus className="w-4 h-4 mr-2" /> Add Sample Cards
             </Button>
           )}
@@ -4291,10 +4335,10 @@ function ReviewView() {
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">All Cards ({allCards.length})</p>
             <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-              {allCards.map(card => {
+              {allCards.map((card, idx) => {
                 const isDue = card.nextReview <= Date.now()
                 return (
-                  <div key={card.id} className="flex items-center justify-between bg-[#15171d] rounded-lg p-2.5 border border-[#272b34]/50">
+            <div key={card.id} className="flex items-center justify-between bg-[#15171d] rounded-lg p-2.5 border border-[#272b34]/50 stagger-card" style={{ animationDelay: `${idx * 0.05}s` }}>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs truncate">{card.front}</p>
                       <p className="text-[10px] text-muted-foreground mt-0.5">
@@ -4326,79 +4370,187 @@ function ReviewView() {
    ======================================================================== */
 function RoomView() {
   const store = useAppStore()
-  const [messages, setMessages] = useState<Array<{ id: string; name: string; avatar: string; text: string; createdAt: string }>>([])
+  const [messages, setMessages] = useState<Array<{ id: string; userId: string; userName: string; text: string; createdAt: string }>>([])
   const [input, setInput] = useState('')
+  const [typingUser, setTypingUser] = useState<string | null>(null)
+  const [onlineUsers, setOnlineUsers] = useState<Array<{ userId: string; userName: string }>>([])
+  const [connected, setConnected] = useState(false)
+  const socketRef = useRef<Socket | null>(null)
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-  const fetchAndSetMessages = useCallback(async () => {
-    try {
-      const res = await fetch('/api/room')
-      const data = await res.json()
-      setMessages(data.messages || [])
-    } catch { /* ignore */ }
+  useEffect(() => {
+    const socket = socketIo('/?XTransformPort=3003', { transports: ['websocket', 'polling'] })
+    socketRef.current = socket
+
+    socket.on('connect', () => {
+      setConnected(true)
+      socket.emit('join', { userId: store.userId || 'anon', userName: store.userName || 'Anonymous' })
+    })
+
+    socket.on('disconnect', () => setConnected(false))
+
+    socket.on('history', (msgs: Array<{ id: string; userId: string; userName: string; text: string; createdAt: string }>) => {
+      setMessages(msgs)
+    })
+
+    socket.on('message', (msg: { id: string; userId: string; userName: string; text: string; createdAt: string }) => {
+      setMessages(prev => [...prev.slice(-49), msg])
+    })
+
+    socket.on('typing', (data: { userId: string; userName: string }) => {
+      setTypingUser(data.userName)
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current)
+      typingTimeoutRef.current = setTimeout(() => setTypingUser(null), 3000)
+    })
+
+    socket.on('users', (users: Array<{ userId: string; userName: string }>) => {
+      setOnlineUsers(users)
+    })
+
+    return () => {
+      socket.disconnect()
+      socketRef.current = null
+    }
   }, [])
 
-  const postMessage = async () => {
+  const sendMessage = () => {
     const text = input.trim()
-    if (!text) return
+    if (!text || !socketRef.current) return
     setInput('')
-    try {
-      await api('/room', { sessionToken: store.sessionToken, text })
-      fetchAndSetMessages()
-    } catch (err: unknown) {
-      toast.error((err as Error).message)
+    socketRef.current.emit('message', { userId: store.userId || 'anon', userName: store.userName || 'Anonymous', text })
+  }
+
+  const handleInputChange = (val: string) => {
+    setInput(val)
+    if (socketRef.current && val.trim()) {
+      socketRef.current.emit('typing', { userId: store.userId || 'anon', userName: store.userName || 'Anonymous' })
     }
   }
 
-  useEffect(() => {
-    const doFetch = async () => {
-      try {
-        const res = await fetch('/api/room')
-        const data = await res.json()
-        setMessages(data.messages || [])
-      } catch { /* ignore */ }
-    }
-    doFetch()
-    const t = setInterval(doFetch, 5000)
-    return () => clearInterval(t)
-  }, [])
+  // Color for each user based on name
+  const getUserColor = (name: string) => {
+    const colors = ['#7c9cff', '#9d7cff', '#5fd0a0', '#ffce6b', '#ff8a8a', '#c084fc', '#38bdf8', '#fb923c']
+    let hash = 0
+    for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash)
+    return colors[Math.abs(hash) % colors.length]
+  }
+
+  const getUserInitial = (name: string) => name.charAt(0).toUpperCase()
 
   return (
-    <div className="flex flex-col h-full animate-tabSwitch">
-      <div className="p-4 border-b border-[#272b34]">
-        <h2 className="text-lg font-bold gradient-text">the world room</h2>
-        <p className="text-xs text-muted-foreground">everyone learning, in one place</p>
-      </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
-        {messages.length === 0 && (
-          <p className="text-center text-muted-foreground text-sm py-8">No messages yet. Say something!</p>
-        )}
-        {messages.map(msg => (
-          <div key={msg.id} className="flex items-start gap-2 chat-bubble-enter">
-            <span className="text-lg">{msg.avatar || '🙂'}</span>
-            <div>
-              <span className="text-xs font-semibold text-[#7c9cff]">{msg.name}</span>
-              <span className="text-xs text-muted-foreground ml-2">
-                {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </span>
-              <p className="text-sm">{msg.text}</p>
-            </div>
+    <div className="flex h-full animate-tabSwitch">
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <div className="p-4 border-b border-[#272b34] flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold gradient-text">the world room</h2>
+            <p className="text-xs text-muted-foreground">everyone learning, in one place</p>
           </div>
-        ))}
+          <div className="flex items-center gap-2">
+            <span className={`w-2 h-2 rounded-full ${connected ? 'bg-[#5fd0a0]' : 'bg-[#ff8a8a]'}`} style={{ animation: connected ? 'pulseDot 2s ease-in-out infinite' : 'none' }} />
+            <Badge className="bg-[#7c9cff]/15 text-[#7c9cff] border-0 text-[10px]">
+              {onlineUsers.length} online
+            </Badge>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+          {messages.length === 0 && (
+            <div className="text-center py-16">
+              <span className="text-5xl block mb-4" style={{ animation: 'bob 3s ease-in-out infinite' }}>🌍</span>
+              <h3 className="font-semibold text-lg mb-2 gradient-text">No messages yet</h3>
+              <p className="text-sm text-muted-foreground mb-4">Be the first to say something!</p>
+              <div className="w-12 h-12 rounded-full mx-auto flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }}>
+                <Send className="w-5 h-5 text-[#0e0f13]" />
+              </div>
+            </div>
+          )}
+          {messages.map(msg => {
+            const isSystem = msg.userId === 'system'
+            const isSelf = msg.userId === store.userId
+            const color = getUserColor(msg.userName)
+            return isSystem ? (
+              <div key={msg.id} className="text-center text-xs text-muted-foreground/50 py-1 chat-bubble-enter">
+                {msg.text}
+              </div>
+            ) : (
+              <div key={msg.id} className={`flex items-start gap-2.5 chat-bubble-enter ${isSelf ? 'flex-row-reverse' : ''}`}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                  style={{ background: isSelf ? 'linear-gradient(135deg, #9d7cff, #7c9cff)' : `linear-gradient(135deg, ${color}, ${color}88)` }}>
+                  <span className="text-[#0e0f13]">{getUserInitial(msg.userName)}</span>
+                </div>
+                <div className={`max-w-[70%] ${isSelf ? 'text-right' : ''}`}>
+                  <div className={`flex items-center gap-2 ${isSelf ? 'justify-end' : ''}`}>
+                    <span className="text-xs font-semibold" style={{ color }}>{msg.userName}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <div className={`mt-1 px-3 py-2 rounded-2xl text-sm inline-block ${
+                    isSelf
+                      ? 'bubble-gradient-user rounded-br-md'
+                      : 'bubble-gradient-assistant rounded-bl-md'
+                  }`}>
+                    {msg.text}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+          {typingUser && (
+            <div className="flex items-center gap-2 text-xs text-muted-foreground animate-slideUp">
+              <div className="flex gap-1">
+                {[0, 1, 2].map(i => (
+                  <span key={i} className="w-1.5 h-1.5 rounded-full bg-[#7c9cff]" style={{ animation: `thinkingDot 1.2s ease-in-out ${i * 0.15}s infinite` }} />
+                ))}
+              </div>
+              <span>{typingUser} is typing...</span>
+            </div>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-[#272b34]">
+          <div className="flex gap-2">
+            <Input
+              value={input}
+              onChange={(e) => handleInputChange(e.target.value)}
+              placeholder="say something..."
+              maxLength={280}
+              className="bg-[#191c23] border-[#272b34] focus:border-[#7c9cff]"
+              onKeyDown={(e) => e.key === 'Enter' && sendMessage()}
+            />
+            <Button onClick={sendMessage}
+              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] shrink-0 btn-hover">
+              <Send className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
       </div>
-      <div className="p-4 border-t border-[#272b34]">
-        <div className="flex gap-2">
-          <Input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="say something..."
-            maxLength={280}
-            className="bg-[#191c23] border-[#272b34] focus:border-[#7c9cff]"
-            onKeyDown={(e) => e.key === 'Enter' && postMessage()}
-          />
-          <Button onClick={postMessage}
-            className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] shrink-0 btn-hover">
-            <Send className="w-4 h-4" />
-          </Button>
+
+      {/* Who's Online Panel - Desktop */}
+      <div className="hidden md:flex w-56 border-l border-[#272b34] bg-[#15171d] flex-col shrink-0">
+        <div className="p-3 border-b border-[#272b34]">
+          <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Who&apos;s Online</h3>
+        </div>
+        <div className="flex-1 overflow-y-auto p-2 space-y-1 custom-scrollbar">
+          {onlineUsers.length === 0 && (
+            <p className="text-xs text-muted-foreground text-center py-4">No one online</p>
+          )}
+          {onlineUsers.map(user => (
+            <div key={user.userId} className="flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-[#191c23] transition-colors">
+              <div className="relative">
+                <div className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold"
+                  style={{ background: `linear-gradient(135deg, ${getUserColor(user.userName)}, ${getUserColor(user.userName)}88)` }}>
+                  <span className="text-[#0e0f13]">{getUserInitial(user.userName)}</span>
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#5fd0a0] border-2 border-[#15171d]" style={{ animation: 'pulseDot 2s ease-in-out infinite' }} />
+              </div>
+              <span className="text-xs truncate">{user.userName}</span>
+            </div>
+          ))}
+        </div>
+        <div className="p-3 border-t border-[#272b34]">
+          <p className="text-[10px] text-muted-foreground/50">{onlineUsers.length} learner{onlineUsers.length !== 1 ? 's' : ''} connected</p>
         </div>
       </div>
     </div>
@@ -4562,14 +4714,14 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v10')
+    localStorage.removeItem('sitwithme-v11')
     window.location.reload()
   }
 
   const handleExportData = () => {
     const data = {
       exportDate: new Date().toISOString(),
-      version: '10.0',
+      version: '11.0',
       profile: store.profile,
       topic: store.topic,
       vision: store.vision,
@@ -4668,7 +4820,7 @@ function SettingsView() {
             />
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
           {/* Voice */}
           <div className="flex items-center justify-between">
@@ -4679,7 +4831,7 @@ function SettingsView() {
             <Switch checked={voiceEnabled} onCheckedChange={toggleVoice} />
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
           {/* Auto Tasks */}
           <div className="flex items-center justify-between">
@@ -4690,7 +4842,7 @@ function SettingsView() {
             <Switch checked={autoTasks} onCheckedChange={(v) => { setAutoTasks(v); store.setSettings({ autoTasks: v }) }} />
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
           {/* Auto Schedule */}
           <div className="flex items-center justify-between">
@@ -4719,7 +4871,7 @@ function SettingsView() {
             <Switch checked={dailyReviewReminders} onCheckedChange={(v) => { setDailyReviewReminders(v); store.setEnhancedSettings({ dailyReviewReminders: v }) }} />
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -4785,7 +4937,7 @@ function SettingsView() {
             </Button>
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -4818,7 +4970,7 @@ function SettingsView() {
             </div>
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
           {/* Google Connections */}
           <div>
@@ -4839,9 +4991,9 @@ function SettingsView() {
             </div>
           </div>
 
-          <Separator className="bg-[#272b34]" />
+          <div className="gradient-divider" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 10.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 11.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -4862,18 +5014,21 @@ function SettingsView() {
    ======================================================================== */
 function QuickNotesPanel({ open, onClose }: { open: boolean; onClose: () => void }) {
   const store = useAppStore()
-  const debounceRef = useRef<NodeJS.Timeout | null>(null)
+  const [newNote, setNewNote] = useState('')
 
-  const handleChange = (val: string) => {
-    if (debounceRef.current) clearTimeout(debounceRef.current)
-    debounceRef.current = setTimeout(() => {
-      store.setQuickNotes(val)
-    }, 500)
-  }
+  const sortedNotes = useMemo(() => {
+    return [...store.quickNotesList].sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1
+      if (!a.pinned && b.pinned) return 1
+      return b.createdAt - a.createdAt
+    })
+  }, [store.quickNotesList])
 
-  const copyAll = () => {
-    navigator.clipboard.writeText(store.quickNotes)
-    toast.success('Notes copied to clipboard')
+  const handleAdd = () => {
+    const text = newNote.trim()
+    if (!text) return
+    store.addQuickNote(text)
+    setNewNote('')
   }
 
   if (!open) return null
@@ -4890,27 +5045,75 @@ function QuickNotesPanel({ open, onClose }: { open: boolean; onClose: () => void
           <div className="flex items-center gap-2">
             <span className="text-sm">📝</span>
             <h3 className="font-semibold text-sm">Quick Notes</h3>
+            <Badge className="text-[9px] bg-[#7c9cff]/15 text-[#7c9cff] border-0">{store.quickNotesList.length}</Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" onClick={copyAll} className="text-[10px] text-muted-foreground h-6 btn-hover">
-              <Copy className="w-3 h-3 mr-1" /> Copy All
-            </Button>
-            <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
-              <X className="w-3 h-3" />
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-6 w-6 p-0">
+            <X className="w-3 h-3" />
+          </Button>
+        </div>
+
+        {/* Add Note Input */}
+        <div className="p-3 border-b border-[#272b34]">
+          <div className="flex gap-2">
+            <Input
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              placeholder="Add a quick note..."
+              className="bg-[#191c23] border-[#272b34] focus:border-[#7c9cff] text-sm"
+              onKeyDown={e => e.key === 'Enter' && handleAdd()}
+            />
+            <Button onClick={handleAdd} size="sm" className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] shrink-0 btn-hover">
+              <Plus className="w-4 h-4" />
             </Button>
           </div>
         </div>
-        <div className="flex-1 p-4">
-          <Textarea
-            value={store.quickNotes}
-            onChange={(e) => handleChange(e.target.value)}
-            placeholder="Write your notes here... auto-saved"
-            className="w-full h-full bg-[#191c23] border-[#272b34] text-foreground text-sm resize-none focus:border-[#7c9cff] custom-scrollbar"
-            style={{ minHeight: 'calc(100vh - 140px)' }}
-          />
+
+        {/* Notes List */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+          {sortedNotes.length === 0 && (
+            <div className="text-center py-12">
+              <span className="text-4xl block mb-3" style={{ animation: 'bob 3s ease-in-out infinite' }}>📝</span>
+              <p className="text-sm gradient-text font-medium">No notes yet</p>
+              <p className="text-xs text-muted-foreground mt-1">Quick notes auto-save</p>
+            </div>
+          )}
+          {sortedNotes.map(note => (
+            <div key={note.id} className={`group p-3 rounded-xl border transition-all card-hover ${
+              note.pinned
+                ? 'bg-[#ffce6b]/5 border-[#ffce6b]/20'
+                : 'bg-[#191c23] border-[#272b34]'
+            }`}>
+              <div className="flex items-start gap-2">
+                {note.pinned && (
+                  <Star className="w-3 h-3 text-[#ffce6b] fill-[#ffce6b] shrink-0 mt-0.5" />
+                )}
+                <p className="text-sm flex-1 break-words">{note.text}</p>
+              </div>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-muted-foreground">{timeAgo(note.createdAt)}</span>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <button
+                    onClick={() => store.togglePinNote(note.id)}
+                    className="p-1 rounded hover:bg-[#272b34] transition-colors"
+                    title={note.pinned ? 'Unpin' : 'Pin'}
+                  >
+                    <Star className={`w-3 h-3 ${note.pinned ? 'text-[#ffce6b] fill-[#ffce6b]' : 'text-muted-foreground'}`} />
+                  </button>
+                  <button
+                    onClick={() => store.removeQuickNote(note.id)}
+                    className="p-1 rounded hover:bg-[#ff8a8a]/10 transition-colors"
+                    title="Delete"
+                  >
+                    <X className="w-3 h-3 text-muted-foreground hover:text-[#ff8a8a]" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
+
         <div className="p-3 border-t border-[#272b34] flex items-center justify-between">
-          <span className="text-[10px] text-muted-foreground">{store.quickNotes.length} characters</span>
+          <span className="text-[10px] text-muted-foreground">{store.quickNotesList.length} note{store.quickNotesList.length !== 1 ? 's' : ''}</span>
           <span className="text-[10px] text-muted-foreground/50">Auto-saved</span>
         </div>
       </div>
@@ -4934,7 +5137,7 @@ function MainApp() {
     { id: 'tasks', icon: <CheckSquare className="w-[18px]" />, label: 'Tasks' },
     { id: 'progress', icon: <TrendingUp className="w-[18px]" />, label: 'Progress' },
     { id: 'resources', icon: <BookOpen className="w-[18px]" />, label: 'Resources' },
-    { id: 'review', icon: <Clipboard className="w-[18px]" />, label: 'Review' },
+    { id: 'review', icon: <Clipboard className="w-[18px]" />, label: <span className="flex items-center gap-1">Review{useAppStore.getState().reviewCards.length > 0 && <span className="text-[9px] bg-[#7c9cff]/20 text-[#7c9cff] px-1 rounded">{useAppStore.getState().reviewCards.length}</span>}</span> },
     { id: 'thinkspace', icon: <Sparkles className="w-[18px]" />, label: 'Think' },
     { id: 'room', icon: <Globe className="w-[18px]" />, label: 'Room' },
     { id: 'settings', icon: <Settings className="w-[18px]" />, label: 'Settings' },
@@ -5053,7 +5256,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v10.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v11.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -5302,6 +5505,18 @@ function MainApp() {
 export default function Home() {
   const { currentView } = useAppStore()
   const cmdPalette = useCommandPalette()
+  const store = useAppStore()
+
+  // Welcome back detection
+  const welcomeName = store.sessionToken && store.userName && store.currentView === 'landing' ? store.userName : ''
+  const [showWelcome, setShowWelcome] = useState(!!welcomeName)
+
+  useEffect(() => {
+    if (welcomeName) {
+      const timer = setTimeout(() => setShowWelcome(false), 2500)
+      return () => clearTimeout(timer)
+    }
+  }, [welcomeName])
 
   const viewKey = currentView
 
@@ -5309,6 +5524,38 @@ export default function Home() {
     <TooltipPrimitive.Provider delayDuration={300}>
       <main className="bg-[#0e0f13] text-[#eef0f4] min-h-screen">
         <GlobalStyles />
+        {/* Welcome Back Overlay */}
+        <AnimatePresence>
+          {showWelcome && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.5 }}
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0e0f13]"
+            >
+              <motion.div
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 1.1, opacity: 0 }}
+                transition={{ duration: 0.6, ease: 'easeOut' }}
+                className="text-center"
+              >
+                <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-2xl font-bold"
+                  style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', boxShadow: '0 0 40px rgba(124,156,255,0.4)' }}>
+                  {welcomeName.charAt(0).toUpperCase()}
+                </div>
+                <h2 className="text-3xl font-bold gradient-text mb-2">Welcome back, {welcomeName}!</h2>
+                <p className="text-muted-foreground text-sm">Resuming your learning journey...</p>
+                <div className="mt-4 flex justify-center gap-1">
+                  {[0, 1, 2].map(i => (
+                    <span key={i} className="w-2 h-2 rounded-full bg-[#7c9cff]" style={{ animation: `thinkingDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
+                  ))}
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
         {/* Global Command Palette for non-app views */}
         {currentView !== 'app' && (
           <CommandPalette key={`cp-root-${cmdPalette.openCount}`} open={cmdPalette.open} onClose={cmdPalette.close} />
