@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
 
+const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -29,28 +31,27 @@ export async function POST(request: Request) {
 
     const systemPrompt = `You are a learning plan designer for "Sit With Me" — an AI learning companion. Create a personalized 7-day learning plan.
 
-Based on the user's profile, design a week of focused learning. Each day should have:
-- A clear theme/focus
-- 2-3 specific activities or micro-tasks
-- Time estimates (respect their daily minutes)
-- A small reflection prompt
+Based on the user's profile, design a week of focused learning. Each day should be achievable in their daily minutes, with one concrete first action.
 
-The plan should build progressively, start accessible, and end with a meaningful milestone.
-
-Return your response as JSON with this exact structure:
+Return your response as JSON with this EXACT structure (no markdown, no code blocks):
 {
   "summary": "A 2-3 sentence overview of the plan",
   "adapts": "How this plan adapts to their level and obstacles",
   "week": [
     {
-      "day": 1,
-      "theme": "Day theme",
-      "tasks": ["Task 1", "Task 2", "Task 3"],
-      "minutes": 20,
-      "reflection": "A reflection question"
+      "day": "Monday",
+      "focus": "Short focus title for this day",
+      "minutes": 30,
+      "firstStep": "One concrete first action they can take right away",
+      "time": "18:00"
     }
   ]
 }
+
+Use actual day names (Monday through Sunday) for the "day" field.
+The "focus" should be a short descriptive phrase (e.g., "React Components & Props").
+The "firstStep" should be a concrete, actionable step.
+The "time" should be a suggested study time in HH:MM format.
 
 User's learning profile:
 ${profileContext.join('\n')}`;
@@ -59,7 +60,7 @@ ${profileContext.join('\n')}`;
     const result = await zai.chat.completions.create({
       model: 'gemini-2.0-flash',
       messages: [
-        { role: 'system', content: systemPrompt },
+        { role: 'assistant', content: systemPrompt },
         { role: 'user', content: 'Create my personalized 7-day learning plan.' },
       ],
       temperature: 0.8,
@@ -68,29 +69,39 @@ ${profileContext.join('\n')}`;
     const content = result?.choices?.[0]?.message?.content || result?.content || '';
 
     // Parse the JSON from the response
-    let planData: { summary: string; adapts: string; week: unknown[] };
+    let planData: { summary: string; adapts: string; week: Array<{ day: string; focus: string; minutes: number; firstStep: string; time?: string }> };
     try {
-      const jsonMatch = content.match(/\{[\s\S]*\}/);
+      const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+      const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         planData = JSON.parse(jsonMatch[0]);
       } else {
         throw new Error('No JSON found in response');
       }
     } catch (parseError) {
-      console.error('[ai/plan] JSON parse error:', parseError);
-      // Fallback plan
+      console.error('[ai/plan] JSON parse error:', parseError, 'Content:', content.slice(0, 200));
+      // Fallback plan with correct format
       planData = {
         summary: `A 7-day progressive plan for learning ${user.topic || 'your topic'}.`,
         adapts: 'Adjusted for your current level and time availability.',
-        week: Array.from({ length: 7 }, (_, i) => ({
-          day: i + 1,
-          theme: `Day ${i + 1}: Exploration`,
-          tasks: ['Review fundamentals', 'Practice exercise', 'Reflect on progress'],
+        week: DAYS.map((dayName, i) => ({
+          day: dayName,
+          focus: `${user.topic || 'Learning'} Exploration - Part ${i + 1}`,
           minutes: parseInt(user.minutesPerDay || '20'),
-          reflection: 'What clicked for you today?',
+          firstStep: `Start with the basics of ${user.topic || 'your topic'} and practice for 15 minutes`,
+          time: '18:00',
         })),
       };
     }
+
+    // Normalize week data to match frontend expectations
+    const normalizedWeek = (planData.week || []).map((day, i) => ({
+      day: typeof day.day === 'number' ? DAYS[(day.day - 1) % 7] || DAYS[i] : String(day.day || DAYS[i]),
+      focus: (day as Record<string, unknown>).focus || (day as Record<string, unknown>).theme || `Day ${i + 1} Focus`,
+      minutes: day.minutes || parseInt(user.minutesPerDay || '20'),
+      firstStep: (day as Record<string, unknown>).firstStep || ((day as Record<string, unknown>).tasks ? ((day as Record<string, unknown>).tasks as string[])[0] : 'Start with fundamentals') as string,
+      time: (day as Record<string, unknown>).time || '18:00',
+    }));
 
     // Save plan to database
     const plan = await db.plan.create({
@@ -98,7 +109,7 @@ ${profileContext.join('\n')}`;
         userId: user.id,
         summary: planData.summary,
         adapts: planData.adapts,
-        weekData: JSON.stringify(planData.week),
+        weekData: JSON.stringify(normalizedWeek),
       },
     });
 
@@ -107,7 +118,7 @@ ${profileContext.join('\n')}`;
         id: plan.id,
         summary: planData.summary,
         adapts: planData.adapts,
-        week: planData.week,
+        week: normalizedWeek,
         createdAt: plan.createdAt,
       },
     });

@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type AppView = 'landing' | 'apikey' | 'onboarding' | 'profile' | 'googleconnect' | 'app'
-export type AppTab = 'session' | 'plan' | 'tasks' | 'progress' | 'room' | 'settings'
+export type AppTab = 'session' | 'plan' | 'tasks' | 'progress' | 'room' | 'settings' | 'thinkspace'
 
 export interface ChatMsg {
   role: 'user' | 'assistant' | 'system'
