@@ -254,48 +254,37 @@ Stage Summary:
 
 ## Current Project Status
 
-The "Sit With Me" learning companion app is at **v7.0 AGENTIC** and is stable and feature-rich. The app is a full Next.js 16 single-page application with:
+The "Sit With Me" learning companion app is at **v9.0 AGENTIC** and is stable and feature-rich. The app is a full Next.js 16 single-page application with:
 
-- **8 main tabs**: Session, Plan, Tasks, Progress, Resources, Think Space, Room, Settings
+- **9 main tabs**: Session, Plan, Tasks, Progress, Resources, Review, Think Space, Room, Settings
 - **Complete auth flow**: Landing → Signup → API Key → AI Onboarding → Profile → Google Connect → Main App
 - **AI-powered features**: Chat mentor, onboarding extraction, plan generation, task extraction, resource curation, daily challenges, session summaries
 - **Rich UI**: Dark/Light theme, framer-motion transitions, Radix tooltips, glassmorphism, confetti, pomodoro timer, focus mode, command palette, keyboard shortcuts
-- **Gamification**: XP/Level system, achievement badges, daily challenges, streaks, weekly heatmap
+- **Gamification**: XP/Level system, achievement badges, daily challenges, streaks, weekly heatmap, mood tracker, spaced repetition
 
-## Current Goals / Completed Modifications / Verification Results
+---
+Task ID: 7
+Agent: Full-Stack Developer (v9.0 Polish)
+Task: Styling Enhancements + Feature Polish
 
-| Goal | Status | Notes |
-|------|--------|-------|
-| QA Testing | ✅ Complete | All flows tested via agent-browser, no errors |
-| Bug Fixes | ✅ No bugs found | Previous API bugs remain fixed |
-| Theme Toggle | ✅ Implemented | Dark/Light with 20+ CSS overrides, Settings + top bar toggle |
-| Resources View | ✅ Implemented | New tab, AI-powered, filtered by type |
-| Chat Search | ✅ Implemented | Search bar, highlighting, navigation |
-| Daily Challenge | ✅ Implemented | Auto-fetch, complete with confetti + XP |
-| Session Summary | ✅ Implemented | AI-generated from chat history |
-| Onboarding Progress | ✅ Implemented | Step X/8 with gradient bar |
-| Framer Motion | ✅ Implemented | Tab and view transitions |
-| Tooltips | ✅ Implemented | Radix tooltips on key elements |
-| Richer Sidebar | ✅ Implemented | Level, XP bar, streak, focus |
-| Better Empty States | ✅ Implemented | Enhanced for 4 views |
-| Lint Check | ✅ 0 errors | Clean code |
-| Dev Server | ✅ Running | Port 3000, responding 200 |
+Work Log:
+- Added Social Proof section to LandingScreen after feature cards with animated counter stats (1,000+ Sessions, 500+ Tasks Created, 50+ Learning Paths, 98% Satisfaction) using countUp keyframe, 6 colored avatar circles with pulseDot animation, "200+ active learners" text, glassmorphism card with border glow
+- Replaced simple Mastery Bar in ProgressView with SVG-based Radial Progress Circle: 120x120 viewBox, gradient stroke (7c9cff → 9d7cff), stroke-dasharray/dashoffset animation, centered mastery % with large text and "Mastery" label, wrapped in Card with proper sizing
+- Added Smart Suggestion Chips after last AI message in ChatSessionView: context-aware heuristics (try/consider → "Show me an example", code → "Explain this code", because/why → "Tell me more", steps → "Can you simplify this?", default → "Tell me more" / "Give me an example" / "How do I practice this?"), pill buttons that fill input on click, animate-slideUp entrance
+- Enhanced SettingsView with 3 new sections: Review Settings (daily review reminders toggle, auto-generate flashcards toggle), Session Preferences (default session duration select: 15/25/45/60 min), Data Management (Export all data as JSON download, Import data from JSON file input with FileReader), reorganized into separate Cards
+- Added Light Theme CSS overrides for: .aurora-bg (warm light gradient), .thinking-ripple (indigo-tinted border), .chat-input-glow (indigo focus glow), review card flip (white background), mood tracker widget (indigo hover glow)
+- Enhanced Command Palette with 4 new commands: "Add Flashcard" → navigates to Review tab, "Toggle Theme" → switches dark/light, "Export Data" → triggers JSON download, "Start Pomodoro" → starts focus timer with default duration
+- Added store fields: dailyReviewReminders (boolean), autoGenerateFlashcards (boolean), defaultSessionDuration (15|25|45|60), setEnhancedSettings() action, all persisted in sitwithme-v9
+- Imported ReviewCard type in page.tsx for SettingsView import data handler
+- Lint check: 0 errors
+- Dev server responding 200
 
-## Unresolved Issues / Risks / Next Phase Recommendations
-
-### Unresolved Issues
-1. **Google OAuth not connected** — Currently uses demo mode. Needs real GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET for actual Google Calendar/Tasks/Gmail integration
-2. **API key persistence** — User's Gemini API key is stored server-side but not re-tested on app load
-3. **Onboarding can be slow** — AI onboarding may take 3-5 message rounds to extract all 8 profile fields
-4. **No real-time sync** — Room chat uses polling (5s interval) instead of WebSocket
-5. **Mobile navigation** — 8 tabs may be too many for mobile bottom nav; need bottom sheet drawer (vaul package is installed but not yet used)
-
-### Priority Recommendations for Next Phase
-1. **Mobile Bottom Sheet Navigation** — Use vaul (already installed) for a "More" drawer on mobile
-2. **Recharts Integration** — Use recharts (already installed) for progress charts instead of simple CSS bars
-3. **Google Calendar Push** — Implement actual Google Calendar event creation via API
-4. **Voice TTS Integration** — Use z-ai-web-dev-sdk TTS for speaking AI responses
-5. **React Syntax Highlighter** — Use react-syntax-highlighter (already installed) for code blocks in chat
-6. **Auto-task Extraction** — Automatic task creation from chat conversations when autoTasks is enabled
-7. **Hugging Face Deployment** — Deploy to HF Spaces for public access
-8. **GitHub Push** — Push v7.0 to coders786/sit-with-me repo
+Stage Summary:
+- 6 enhancement categories implemented across page.tsx and store.ts
+- Landing page now has social proof with animated stats and avatars
+- Progress view has radial SVG mastery circle with gradient stroke
+- Chat has context-aware suggestion chips after AI responses
+- Settings expanded to 5 organized cards with review, session, and data management sections
+- Light theme CSS covers aurora, thinking ripple, chat input glow, review cards, mood tracker
+- Command palette has 13 total commands (up from 9) including Add Flashcard, Toggle Theme, Export Data, Start Pomodoro
+- App remains at v9.0 AGENTIC, store persist key sitwithme-v9 unchanged

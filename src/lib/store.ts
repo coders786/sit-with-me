@@ -231,6 +231,12 @@ interface AppState {
   sessionStartTime: number | null
   setSessionStartTime: (time: number | null) => void
 
+  // Enhanced Settings
+  dailyReviewReminders: boolean
+  autoGenerateFlashcards: boolean
+  defaultSessionDuration: 15 | 25 | 45 | 60
+  setEnhancedSettings: (data: Partial<{ dailyReviewReminders: boolean; autoGenerateFlashcards: boolean; defaultSessionDuration: 15 | 25 | 45 | 60 }>) => void
+
   // Actions
   setView: (view: AppView) => void
   setTab: (tab: AppTab) => void
@@ -438,6 +444,12 @@ export const useAppStore = create<AppState>()(
       sessionStartTime: null,
       setSessionStartTime: (time) => set({ sessionStartTime: time }),
 
+      // Enhanced Settings
+      dailyReviewReminders: true,
+      autoGenerateFlashcards: false,
+      defaultSessionDuration: 25 as const,
+      setEnhancedSettings: (data) => set((s) => ({ ...s, ...data })),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -468,6 +480,7 @@ export const useAppStore = create<AppState>()(
         sessionSummaries: [], dailyChallenge: null, quickNotes: '',
         reviewCards: [], moodLogs: [], messageReactions: [],
         sessionStartTime: null,
+        dailyReviewReminders: true, autoGenerateFlashcards: false, defaultSessionDuration: 25 as const,
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -590,6 +603,9 @@ export const useAppStore = create<AppState>()(
         moodLogs: state.moodLogs,
         messageReactions: state.messageReactions,
         sessionStartTime: state.sessionStartTime,
+        dailyReviewReminders: state.dailyReviewReminders,
+        autoGenerateFlashcards: state.autoGenerateFlashcards,
+        defaultSessionDuration: state.defaultSessionDuration,
       }),
     }
   )

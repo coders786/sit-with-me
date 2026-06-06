@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react'
-import { useAppStore, type AppView, type AppTab, type ChatMsg } from '@/lib/store'
+import { useAppStore, type AppView, type AppTab, type ChatMsg, type ReviewCard } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -428,6 +428,33 @@ function GlobalStyles() {
           linear-gradient(rgba(99,102,241,0.05) 1px, transparent 1px),
           linear-gradient(90deg, rgba(99,102,241,0.05) 1px, transparent 1px);
       }
+      /* Light Theme - Aurora background */
+      [data-theme="light"] .aurora-bg {
+        background: linear-gradient(135deg, #f8f9fb, #eef0f5, #f3f4f8, #f0f1f6);
+        background-size: 400% 400%;
+        animation: aurora 15s ease infinite;
+      }
+      /* Light Theme - Thinking ripple */
+      [data-theme="light"] .thinking-ripple::before,
+      [data-theme="light"] .thinking-ripple::after {
+        border-color: rgba(99,102,241,0.25);
+      }
+      /* Light Theme - Chat input glow */
+      [data-theme="light"] .chat-input-glow:focus-within {
+        border-color: rgba(99,102,241,0.4);
+        box-shadow: 0 0 12px rgba(99,102,241,0.1);
+      }
+      /* Light Theme - Review card flip */
+      [data-theme="light"] .backface-hidden + div .bg-\\[\\#191c23\\],
+      [data-theme="light"] .perspective-1000 .bg-\\[\\#191c23\\] {
+        background-color: #ffffff !important;
+        border-color: #e5e7eb !important;
+      }
+      /* Light Theme - Mood tracker widget */
+      [data-theme="light"] .card-hover:hover {
+        box-shadow: 0 0 20px rgba(99,102,241,0.08), 0 0 40px rgba(99,102,241,0.04);
+        border-color: rgba(99,102,241,0.2) !important;
+      }
     `}</style>
   )
 }
@@ -534,6 +561,28 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'generate-plan', label: 'Generate Plan', icon: <Calendar className="w-4 h-4" />, desc: 'Create 7-day learning plan', action: () => { store.setTab('plan'); onClose() } },
     { id: 'view-tasks', label: 'View Tasks', icon: <CheckSquare className="w-4 h-4" />, desc: 'See your learning tasks', action: () => { store.setTab('tasks'); onClose() } },
     { id: 'progress', label: 'Progress', icon: <TrendingUp className="w-4 h-4" />, desc: 'Check your progress', action: () => { store.setTab('progress'); onClose() } },
+    { id: 'add-flashcard', label: 'Add Flashcard', icon: <BookMarked className="w-4 h-4" />, desc: 'Go to Review tab', action: () => { store.setTab('review'); onClose() } },
+    { id: 'toggle-theme', label: 'Toggle Theme', icon: <Sun className="w-4 h-4" />, desc: 'Switch dark/light mode', action: () => { store.setTheme(store.theme === 'dark' ? 'light' : 'dark'); toast.success(`Switched to ${store.theme === 'dark' ? 'light' : 'dark'} mode`); onClose() } },
+    { id: 'export-data', label: 'Export Data', icon: <Download className="w-4 h-4" />, desc: 'Download all data as JSON', action: () => {
+      const state = useAppStore.getState()
+      const data = {
+        exportDate: new Date().toISOString(), version: '9.0',
+        profile: state.profile, topic: state.topic, vision: state.vision,
+        tasks: state.tasks, reviewCards: state.reviewCards, moodLogs: state.moodLogs,
+        chatMessages: state.chatMessages, quickNotes: state.quickNotes,
+        progress: { sessionCount: state.sessionCount, wins: state.wins, xp: state.xp, mastery: state.mastery },
+      }
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = `sitwithme-export.json`; a.click()
+      URL.revokeObjectURL(url); toast.success('Data exported!'); onClose()
+    }},
+    { id: 'start-pomodoro', label: 'Start Pomodoro', icon: <Clock className="w-4 h-4" />, desc: 'Start focus timer', action: () => {
+      const state = useAppStore.getState()
+      const dur = state.defaultSessionDuration
+      state.setPomodoroState({ running: true, timeLeft: dur * 60, mode: 'work' })
+      toast.success(`Pomodoro started! ${dur} min focus.`); onClose()
+    }},
     { id: 'room', label: 'World Room', icon: <Globe className="w-4 h-4" />, desc: 'Community chat', action: () => { store.setTab('room'); onClose() } },
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
@@ -1222,6 +1271,39 @@ function LandingScreen() {
             <p className="text-xs text-muted-foreground">{f.desc}</p>
           </div>
         ))}
+      </div>
+
+      {/* Social Proof Section */}
+      <div className="max-w-3xl mx-auto mb-8 relative z-10" style={{ animation: 'fadeInUp 0.6s ease-out both', animationDelay: '650ms' }}>
+        <div className="glass rounded-2xl p-6 border border-[#7c9cff]/10 animate-borderGlow">
+          <p className="text-center text-xs text-muted-foreground uppercase tracking-widest mb-5">Trusted by learners worldwide</p>
+          {/* Animated Counter Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+            {[
+              { value: '1,000+', label: 'Sessions', color: '#7c9cff' },
+              { value: '500+', label: 'Tasks Created', color: '#5fd0a0' },
+              { value: '50+', label: 'Learning Paths', color: '#9d7cff' },
+              { value: '98%', label: 'Satisfaction', color: '#ffce6b' },
+            ].map((s, i) => (
+              <div key={s.label} className="text-center" style={{ animation: `countUp 0.6s ease-out ${i * 120 + 200}ms both` }}>
+                <div className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</div>
+                <div className="text-[10px] text-muted-foreground uppercase tracking-wider mt-0.5">{s.label}</div>
+              </div>
+            ))}
+          </div>
+          {/* Active Learner Avatars */}
+          <div className="flex items-center justify-center gap-2">
+            <div className="flex -space-x-2">
+              {['#7c9cff', '#9d7cff', '#5fd0a0', '#ffce6b', '#f472b6', '#c084fc'].map((c, i) => (
+                <div key={i} className="w-7 h-7 rounded-full border-2 border-[#0e0f13] flex items-center justify-center text-[10px] font-bold"
+                  style={{ background: c, color: '#0e0f13', animation: `pulseDot ${1.5 + i * 0.3}s ease-in-out infinite` }}>
+                  {String.fromCharCode(65 + i)}
+                </div>
+              ))}
+            </div>
+            <span className="text-xs text-muted-foreground ml-2">and 200+ active learners</span>
+          </div>
+        </div>
       </div>
 
       {/* Stats Row */}
@@ -2200,6 +2282,16 @@ function ChatSessionView() {
 
         {store.chatMessages.map((msg, i) => {
           const isSearchMatch = searchQuery.trim() && searchResults.some(r => r.i === i)
+          const isLastAiMessage = msg.role === 'assistant' && i === store.chatMessages.length - 1 && !store.chatBusy
+          // Smart suggestion chips heuristics
+          const getSuggestions = (content: string): string[] => {
+            const lower = content.toLowerCase()
+            if (/try|attempt|consider/i.test(lower)) return ['Show me an example', 'Break this down further', 'How do I practice this?']
+            if (/```|code|function|class |import |const |let |var /i.test(lower)) return ['Explain this code', 'Show me a simpler version', 'How do I debug this?']
+            if (/because|reason|why/i.test(lower)) return ['Tell me more', 'What are the alternatives?', 'Give me an example']
+            if (/step|first|then|next|finally/i.test(lower)) return ['Can you simplify this?', 'What if I get stuck?', 'Show me a practice exercise']
+            return ['Tell me more', 'Give me an example', 'How do I practice this?']
+          }
           return (
             <div key={i} className={`flex gap-3 chat-bubble-enter ${msg.role === 'user' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'} ${isSearchMatch ? 'ring-1 ring-[#7c9cff]/40 rounded-xl' : ''}`}>
               {msg.role === 'assistant' && (
@@ -2208,48 +2300,64 @@ function ChatSessionView() {
                   🧠
                 </div>
               )}
-              <div className={`relative group max-w-[78%] ${
-                msg.role === 'user'
-                  ? 'bubble-gradient-user text-foreground rounded-2xl rounded-tr-sm whitespace-pre-wrap px-4 py-3 text-sm'
-                  : msg.role === 'system'
-                    ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%] px-4 py-3 rounded-2xl'
-                    : 'bubble-gradient-assistant text-foreground rounded-2xl rounded-tl-sm px-4 py-3 text-sm border-l-2 border-l-[#7c9cff]/60 hover:shadow-[0_0_15px_rgba(124,156,255,0.15)] transition-shadow duration-300'
-              }`}>
-                {searchQuery.trim() ? highlightText(msg.content) : (msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content)}
-                {/* Timestamp */}
-                <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
-                  {timeAgo(msg.timestamp)}
+              <div className="flex flex-col max-w-[78%]">
+                <div className={`relative group ${
+                  msg.role === 'user'
+                    ? 'bubble-gradient-user text-foreground rounded-2xl rounded-tr-sm whitespace-pre-wrap px-4 py-3 text-sm'
+                    : msg.role === 'system'
+                      ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%] px-4 py-3 rounded-2xl'
+                      : 'bubble-gradient-assistant text-foreground rounded-2xl rounded-tl-sm px-4 py-3 text-sm border-l-2 border-l-[#7c9cff]/60 hover:shadow-[0_0_15px_rgba(124,156,255,0.15)] transition-shadow duration-300'
+                }`}>
+                  {searchQuery.trim() ? highlightText(msg.content) : (msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content)}
+                  {/* Timestamp */}
+                  <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
+                    {timeAgo(msg.timestamp)}
+                  </div>
+                  {/* Copy & Bookmark & Reaction buttons on assistant messages */}
+                  {msg.role === 'assistant' && (
+                    <div className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                      {/* Message Reactions */}
+                      {(['👍', '👎', '💡', '📌'] as const).map(reaction => {
+                        const isActive = store.messageReactions.some(r => r.messageId === `msg-${i}` && r.reaction === reaction)
+                        return (
+                          <button
+                            key={reaction}
+                            onClick={() => store.addMessageReaction(`msg-${i}`, reaction)}
+                            className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1 py-0.5 text-[10px] transition-colors ${isActive ? 'ring-1 ring-[#7c9cff]/50' : ''}`}
+                          >
+                            {reaction}
+                          </button>
+                        )
+                      })}
+                      <button
+                        onClick={() => copyToClipboard(msg.content, i)}
+                        className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
+                      >
+                        {copiedIdx === i ? <CheckCheck className="w-3 h-3 text-[#5fd0a0]" /> : <Copy className="w-3 h-3" />}
+                        {copiedIdx === i ? 'Copied' : 'Copy'}
+                      </button>
+                      <button onClick={() => {
+                        const isBookmarked = store.bookmarkedMessages.some(b => b.id === `msg-${i}`)
+                        if (isBookmarked) store.removeBookmark(`msg-${i}`)
+                        else store.addBookmark({ id: `msg-${i}`, content: msg.content, timestamp: msg.timestamp })
+                      }} className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] flex items-center gap-1 ${store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? 'text-[#ffce6b]' : 'text-muted-foreground'}`}>
+                        <Star className="w-3 h-3" fill={store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? '#ffce6b' : 'none'} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-                {/* Copy & Bookmark & Reaction buttons on assistant messages */}
-                {msg.role === 'assistant' && (
-                  <div className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    {/* Message Reactions */}
-                    {(['👍', '👎', '💡', '📌'] as const).map(reaction => {
-                      const isActive = store.messageReactions.some(r => r.messageId === `msg-${i}` && r.reaction === reaction)
-                      return (
-                        <button
-                          key={reaction}
-                          onClick={() => store.addMessageReaction(`msg-${i}`, reaction)}
-                          className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1 py-0.5 text-[10px] transition-colors ${isActive ? 'ring-1 ring-[#7c9cff]/50' : ''}`}
-                        >
-                          {reaction}
-                        </button>
-                      )
-                    })}
-                    <button
-                      onClick={() => copyToClipboard(msg.content, i)}
-                      className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
-                    >
-                      {copiedIdx === i ? <CheckCheck className="w-3 h-3 text-[#5fd0a0]" /> : <Copy className="w-3 h-3" />}
-                      {copiedIdx === i ? 'Copied' : 'Copy'}
-                    </button>
-                    <button onClick={() => {
-                      const isBookmarked = store.bookmarkedMessages.some(b => b.id === `msg-${i}`)
-                      if (isBookmarked) store.removeBookmark(`msg-${i}`)
-                      else store.addBookmark({ id: `msg-${i}`, content: msg.content, timestamp: msg.timestamp })
-                    }} className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] flex items-center gap-1 ${store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? 'text-[#ffce6b]' : 'text-muted-foreground'}`}>
-                      <Star className="w-3 h-3" fill={store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? '#ffce6b' : 'none'} />
-                    </button>
+                {/* Smart Suggestion Chips after last AI message */}
+                {isLastAiMessage && (
+                  <div className="flex flex-wrap gap-1.5 mt-2 animate-slideUp">
+                    {getSuggestions(msg.content).map(suggestion => (
+                      <button
+                        key={suggestion}
+                        onClick={() => setInput(suggestion)}
+                        className="text-[11px] text-[#7c9cff] bg-[#7c9cff]/8 border border-[#7c9cff]/20 rounded-full px-2.5 py-1 hover:bg-[#7c9cff]/15 hover:border-[#7c9cff]/30 transition-colors btn-hover"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -2955,13 +3063,33 @@ function ProgressView() {
         </CardContent>
       </Card>
 
-      {/* Mastery Bar */}
-      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover">
-        <CardContent className="p-4">
-          <div className="flex justify-between text-xs text-muted-foreground mb-2">
-            <span>mastery bar</span><span>{mastery}%</span>
+      {/* Radial Mastery Circle */}
+      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
+        <CardContent className="p-6 flex flex-col items-center">
+          <div className="relative w-40 h-40">
+            <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
+              <defs>
+                <linearGradient id="masteryGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#7c9cff" />
+                  <stop offset="100%" stopColor="#9d7cff" />
+                </linearGradient>
+              </defs>
+              {/* Background circle */}
+              <circle cx="60" cy="60" r="50" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+              {/* Progress circle */}
+              <circle cx="60" cy="60" r="50" fill="none" stroke="url(#masteryGrad)" strokeWidth="8"
+                strokeLinecap="round"
+                strokeDasharray={`${Math.PI * 100}`}
+                strokeDashoffset={`${Math.PI * 100 * (1 - mastery / 100)}`}
+                style={{ transition: 'stroke-dashoffset 1.2s ease-out' }}
+              />
+            </svg>
+            {/* Center text */}
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-bold bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] bg-clip-text text-transparent">{mastery}%</span>
+              <span className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">Mastery</span>
+            </div>
           </div>
-          <Progress value={mastery} className="h-2" />
         </CardContent>
       </Card>
 
@@ -3001,7 +3129,7 @@ function ProgressView() {
                 day,
                 xp: Math.max(0, baseXp + Math.floor((xp / 7) * (i + 1) + (wins * i * 2) - (i * 3 + 2)))
               }))
-            }, [xp, wins, sessionCount])}>
+            }, [xp, wins, totalSessions])}>
               <defs>
                 <linearGradient id="xpGradient" x1="0" y1="0" x2="1" y2="0">
                   <stop offset="0%" stopColor="#7c9cff" />
@@ -3043,7 +3171,7 @@ function ProgressView() {
                 {[0, 1, 2, 3, 4, 5, 6].map(day => {
                   const idx = week * 7 + day
                   const activityLevel = (() => {
-                    const base = sessionCount + wins + Math.floor(xp / 10)
+                    const base = totalSessions + wins + Math.floor(xp / 10)
                     const val = (base * (idx + 1) + store.xp * (idx % 3)) % 7
                     if (val < 2) return 0
                     if (val < 4) return 1
@@ -3752,6 +3880,10 @@ function SettingsView() {
   const [voiceEnabled, setVoiceEnabled] = useState(store.voiceEnabled)
   const [autoTasks, setAutoTasks] = useState(store.autoTasks)
   const [autoSchedule, setAutoSchedule] = useState(store.autoSchedule)
+  const [dailyReviewReminders, setDailyReviewReminders] = useState(store.dailyReviewReminders)
+  const [autoGenerateFlashcards, setAutoGenerateFlashcards] = useState(store.autoGenerateFlashcards)
+  const [defaultSessionDuration, setDefaultSessionDuration] = useState(store.defaultSessionDuration)
+  const importRef = useRef<HTMLInputElement>(null)
 
   const toggleVoice = () => {
     const newVal = !voiceEnabled
@@ -3768,6 +3900,87 @@ function SettingsView() {
   const handleReset = () => {
     localStorage.removeItem('sitwithme-v9')
     window.location.reload()
+  }
+
+  const handleExportData = () => {
+    const data = {
+      exportDate: new Date().toISOString(),
+      version: '9.0',
+      profile: store.profile,
+      topic: store.topic,
+      vision: store.vision,
+      domain: store.domain,
+      level: store.level,
+      tasks: store.tasks,
+      planWeek: store.planWeek,
+      planSummary: store.planSummary,
+      reviewCards: store.reviewCards,
+      moodLogs: store.moodLogs,
+      sessionSummaries: store.sessionSummaries,
+      chatMessages: store.chatMessages,
+      bookmarkedMessages: store.bookmarkedMessages,
+      quickNotes: store.quickNotes,
+      progress: {
+        sessionCount: store.sessionCount,
+        wins: store.wins,
+        successStreak: store.successStreak,
+        bestStreak: store.bestStreak,
+        mastery: store.mastery,
+        xp: store.xp,
+      },
+      settings: {
+        autoTasks: store.autoTasks,
+        autoSchedule: store.autoSchedule,
+        voiceEnabled: store.voiceEnabled,
+        dailyReviewReminders: store.dailyReviewReminders,
+        autoGenerateFlashcards: store.autoGenerateFlashcards,
+        defaultSessionDuration: store.defaultSessionDuration,
+        theme: store.theme,
+      },
+    }
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sitwithme-export-${new Date().toISOString().slice(0, 10)}.json`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('Data exported successfully!')
+  }
+
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      try {
+        const data = JSON.parse(ev.target?.result as string)
+        if (data.tasks) store.setTasks(data.tasks)
+        if (data.reviewCards) data.reviewCards.forEach((c: ReviewCard) => store.addReviewCard(c))
+        if (data.quickNotes !== undefined) store.setQuickNotes(data.quickNotes)
+        if (data.progress) store.setProgress(data.progress)
+        if (data.settings) {
+          if (data.settings.dailyReviewReminders !== undefined) {
+            setDailyReviewReminders(data.settings.dailyReviewReminders)
+            store.setEnhancedSettings({ dailyReviewReminders: data.settings.dailyReviewReminders })
+          }
+          if (data.settings.autoGenerateFlashcards !== undefined) {
+            setAutoGenerateFlashcards(data.settings.autoGenerateFlashcards)
+            store.setEnhancedSettings({ autoGenerateFlashcards: data.settings.autoGenerateFlashcards })
+          }
+          if (data.settings.defaultSessionDuration) {
+            setDefaultSessionDuration(data.settings.defaultSessionDuration)
+            store.setEnhancedSettings({ defaultSessionDuration: data.settings.defaultSessionDuration })
+          }
+        }
+        toast.success('Data imported successfully!')
+      } catch {
+        toast.error('Invalid import file. Please use a valid Sit With Me export.')
+      }
+    }
+    reader.readAsText(file)
+    // Reset the file input
+    if (importRef.current) importRef.current.value = ''
   }
 
   return (
@@ -3823,9 +4036,114 @@ function SettingsView() {
             </div>
             <Switch checked={autoSchedule} onCheckedChange={(v) => { setAutoSchedule(v); store.setSettings({ autoSchedule: v }) }} />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Review Settings */}
+      <Card className="bg-[#191c23] border-[#272b34] mt-4 card-hover">
+        <CardContent className="p-6 space-y-6">
+          <Label className="font-medium text-xs text-muted-foreground uppercase tracking-wider">Review Settings</Label>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="w-4 h-4 text-[#9d7cff]" />
+              <div>
+                <Label className="font-medium">Daily review reminders</Label>
+                <p className="text-xs text-muted-foreground">Get notified when cards are due</p>
+              </div>
+            </div>
+            <Switch checked={dailyReviewReminders} onCheckedChange={(v) => { setDailyReviewReminders(v); store.setEnhancedSettings({ dailyReviewReminders: v }) }} />
+          </div>
 
           <Separator className="bg-[#272b34]" />
 
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-[#7c9cff]" />
+              <div>
+                <Label className="font-medium">Auto-generate flashcards</Label>
+                <p className="text-xs text-muted-foreground">AI creates review cards from chat</p>
+              </div>
+            </div>
+            <Switch checked={autoGenerateFlashcards} onCheckedChange={(v) => { setAutoGenerateFlashcards(v); store.setEnhancedSettings({ autoGenerateFlashcards: v }) }} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Session Preferences */}
+      <Card className="bg-[#191c23] border-[#272b34] mt-4 card-hover">
+        <CardContent className="p-6 space-y-6">
+          <Label className="font-medium text-xs text-muted-foreground uppercase tracking-wider">Session Preferences</Label>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-[#ffce6b]" />
+              <div>
+                <Label className="font-medium">Default session duration</Label>
+                <p className="text-xs text-muted-foreground">Pomodoro timer default length</p>
+              </div>
+            </div>
+            <Select value={String(defaultSessionDuration)} onValueChange={(v) => {
+              const val = Number(v) as 15 | 25 | 45 | 60
+              setDefaultSessionDuration(val)
+              store.setEnhancedSettings({ defaultSessionDuration: val })
+              store.setPomodoroState({ timeLeft: val * 60 })
+            }}>
+              <SelectTrigger className="w-24 bg-[#0e0f13] border-[#272b34] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="bg-[#191c23] border-[#272b34]">
+                <SelectItem value="15">15 min</SelectItem>
+                <SelectItem value="25">25 min</SelectItem>
+                <SelectItem value="45">45 min</SelectItem>
+                <SelectItem value="60">60 min</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Management */}
+      <Card className="bg-[#191c23] border-[#272b34] mt-4 card-hover">
+        <CardContent className="p-6 space-y-6">
+          <Label className="font-medium text-xs text-muted-foreground uppercase tracking-wider">Data Management</Label>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Download className="w-4 h-4 text-[#5fd0a0]" />
+              <div>
+                <Label className="font-medium">Export all data</Label>
+                <p className="text-xs text-muted-foreground">Download your data as JSON</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExportData} className="border-[#5fd0a0]/30 text-[#5fd0a0] hover:bg-[#5fd0a0]/10 btn-hover text-xs">
+              <Download className="w-3 h-3 mr-1" /> Export
+            </Button>
+          </div>
+
+          <Separator className="bg-[#272b34]" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clipboard className="w-4 h-4 text-[#7c9cff]" />
+              <div>
+                <Label className="font-medium">Import data</Label>
+                <p className="text-xs text-muted-foreground">Restore from a previous export</p>
+              </div>
+            </div>
+            <div>
+              <input ref={importRef} type="file" accept=".json" onChange={handleImportData} className="hidden" />
+              <Button variant="outline" size="sm" onClick={() => importRef.current?.click()} className="border-[#7c9cff]/30 text-[#7c9cff] hover:bg-[#7c9cff]/10 btn-hover text-xs">
+                <Clipboard className="w-3 h-3 mr-1" /> Import
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Account Info */}
+      <Card className="bg-[#191c23] border-[#272b34] mt-4 card-hover">
+        <CardContent className="p-6 space-y-6">
           {/* User Info */}
           <div>
             <Label className="font-medium text-xs text-muted-foreground uppercase tracking-wider">Account</Label>
