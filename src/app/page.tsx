@@ -247,6 +247,11 @@ function GlobalStyles() {
       .bubble-gradient-user {
         background: linear-gradient(135deg, #2c3450 0%, #2a3555 100%);
       }
+
+      /* Glassmorphism helpers */
+      .glass { background: rgba(25, 28, 35, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.08); }
+      .glass-hover:hover { background: rgba(25, 28, 35, 0.8); border-color: rgba(124,156,255,0.2) !important; }
+      .vignette { box-shadow: inset 0 0 150px rgba(0,0,0,0.5); }
     `}</style>
   )
 }
@@ -345,7 +350,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v5'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v6'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -468,6 +473,7 @@ function KeyboardShortcutsModal({ open, onClose }: { open: boolean; onClose: () 
     { keys: '⌘K', desc: 'Command Palette' },
     { keys: '⌘Enter', desc: 'Send message' },
     { keys: '1-7', desc: 'Switch tabs' },
+    { keys: '⇧⌘F', desc: 'Focus Mode' },
     { keys: '?', desc: 'Show shortcuts' },
     { keys: 'Esc', desc: 'Close modal/palette' },
   ]
@@ -527,6 +533,12 @@ function useKeyboardShortcuts() {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         const sendBtn = document.querySelector('[data-send-btn]') as HTMLButtonElement
         if (sendBtn && !sendBtn.disabled) sendBtn.click()
+      }
+      // Ctrl+Shift+F for Focus Mode
+      if (e.shiftKey && (e.metaKey || e.ctrlKey) && e.key === 'F') {
+        e.preventDefault()
+        const currentStore = useAppStore.getState()
+        currentStore.setFocusMode(!currentStore.focusMode)
       }
     }
     window.addEventListener('keydown', handleKey)
@@ -641,6 +653,231 @@ function ThinkingIndicator() {
 }
 
 /* ========================================================================
+   CONFETTI EFFECT
+   ======================================================================== */
+function ConfettiEffect() {
+  const store = useAppStore()
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    if (!store.confettiActive) return
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    canvas.width = window.innerWidth
+    canvas.height = window.innerHeight
+
+    const colors = ['#7c9cff', '#9d7cff', '#5fd0a0', '#ffce6b', '#c5d0ff', '#f472b6']
+    const particles = Array.from({ length: 50 }, () => ({
+      x: window.innerWidth / 2 + (Math.random() - 0.5) * 200,
+      y: window.innerHeight * 0.3,
+      vx: (Math.random() - 0.5) * 12,
+      vy: Math.random() * -12 - 4,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      size: Math.random() * 6 + 3,
+      rotation: Math.random() * 360,
+      rotationSpeed: (Math.random() - 0.5) * 10,
+      gravity: 0.15 + Math.random() * 0.1,
+    }))
+
+    let frame = 0
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height)
+      let alive = false
+      particles.forEach(p => {
+        p.x += p.vx
+        p.vy += p.gravity
+        p.y += p.vy
+        p.rotation += p.rotationSpeed
+        p.vx *= 0.99
+        if (p.y < canvas.height + 20) {
+          alive = true
+          ctx.save()
+          ctx.translate(p.x, p.y)
+          ctx.rotate((p.rotation * Math.PI) / 180)
+          ctx.fillStyle = p.color
+          ctx.globalAlpha = Math.max(0, 1 - frame / 120)
+          ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6)
+          ctx.restore()
+        }
+      })
+      frame++
+      if (alive && frame < 150) requestAnimationFrame(animate)
+      else {
+        ctx.clearRect(0, 0, canvas.width, canvas.height)
+        setTimeout(() => useAppStore.setState({ confettiActive: false }), 100)
+      }
+    }
+    requestAnimationFrame(animate)
+  }, [store.confettiActive])
+
+  if (!store.confettiActive) return null
+  return <canvas ref={canvasRef} className="fixed inset-0 z-[200] pointer-events-none" />
+}
+
+/* ========================================================================
+   POMODORO TIMER FLOATING WIDGET
+   ======================================================================== */
+function PomodoroWidget() {
+  const store = useAppStore()
+  const [expanded, setExpanded] = useState(false)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const { running, timeLeft, sessionsCompleted, mode } = store.pomodoroState
+
+  useEffect(() => {
+    if (running && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        const s = useAppStore.getState().pomodoroState
+        if (s.timeLeft <= 1) {
+          clearInterval(intervalRef.current!)
+          if (s.mode === 'work') {
+            const newSessions = s.sessionsCompleted + 1
+            store.setPomodoroState({ running: false, timeLeft: 0, sessionsCompleted: newSessions })
+            store.addNotification(`🍅 Pomodoro #${newSessions} complete! +5 XP`)
+            store.setProgress({ xp: store.xp + 5 })
+            try {
+              const ac = new AudioContext()
+              const osc = ac.createOscillator()
+              const gain = ac.createGain()
+              osc.connect(gain)
+              gain.connect(ac.destination)
+              osc.frequency.value = 800
+              gain.gain.value = 0.3
+              osc.start()
+              gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 0.5)
+              osc.stop(ac.currentTime + 0.5)
+            } catch { /* audio not available */ }
+          } else {
+            store.setPomodoroState({ running: false, timeLeft: 25 * 60, mode: 'work' })
+            store.addNotification('☕ Break over! Ready for another session?')
+          }
+        } else {
+          store.setPomodoroState({ timeLeft: s.timeLeft - 1 })
+        }
+      }, 1000)
+    }
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
+  }, [running])
+
+  const mins = Math.floor(timeLeft / 60)
+  const secs = timeLeft % 60
+  const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`
+
+  const startWork = () => store.setPomodoroState({ running: true, timeLeft: 25 * 60, mode: 'work' })
+  const startBreak = () => store.setPomodoroState({ running: true, timeLeft: 5 * 60, mode: 'break' })
+  const pause = () => store.setPomodoroState({ running: false })
+  const reset = () => store.setPomodoroState({ running: false, timeLeft: 25 * 60, mode: 'work' })
+
+  return (
+    <div className="fixed bottom-6 right-6 z-50">
+      {expanded ? (
+        <div className="bg-[#191c23]/90 backdrop-blur-xl border border-white/10 rounded-2xl p-4 w-64 shadow-2xl animate-fadeInUp"
+          style={{ boxShadow: running ? '0 0 30px rgba(124,156,255,0.15)' : 'none' }}>
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-xs text-[#9d7cff] font-semibold uppercase tracking-wider">
+              {mode === 'work' ? '🍅 Focus' : '☕ Break'}
+            </span>
+            <button onClick={() => setExpanded(false)} className="text-muted-foreground hover:text-foreground transition-colors">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className={`text-3xl font-mono font-bold text-center mb-3 ${running ? 'text-[#7c9cff]' : 'text-foreground'}`}>
+            {timeStr}
+          </div>
+          <div className="flex gap-2 justify-center mb-3">
+            {!running ? (
+              <Button size="sm" onClick={mode === 'work' ? startWork : startBreak}
+                className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] text-xs btn-hover">
+                {timeLeft === 25 * 60 || timeLeft === 5 * 60 ? 'Start' : 'Resume'}
+              </Button>
+            ) : (
+              <Button size="sm" variant="outline" onClick={pause} className="text-xs border-[#272b34] btn-hover">Pause</Button>
+            )}
+            <Button size="sm" variant="ghost" onClick={reset} className="text-xs text-muted-foreground btn-hover">Reset</Button>
+          </div>
+          <div className="flex gap-1 justify-center">
+            {Array.from({ length: 4 }, (_, i) => (
+              <div key={i} className={`w-2 h-2 rounded-full ${i < sessionsCompleted ? 'bg-[#7c9cff]' : 'bg-[#272b34]'}`} />
+            ))}
+          </div>
+          <p className="text-[10px] text-muted-foreground text-center mt-1">{sessionsCompleted}/4 sessions</p>
+        </div>
+      ) : (
+        <button
+          onClick={() => setExpanded(true)}
+          className={`w-12 h-12 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110 ${
+            running ? 'bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13]' : 'bg-[#191c23]/80 backdrop-blur border border-white/10 text-muted-foreground hover:text-foreground'
+          }`}
+          style={running ? { boxShadow: '0 0 20px rgba(124,156,255,0.3)' } : {}}
+        >
+          {running ? <span className="text-sm font-mono">{timeStr}</span> : <Clock className="w-5 h-5" />}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ========================================================================
+   FOCUS MODE OVERLAY
+   ======================================================================== */
+function FocusModeOverlay({ children }: { children: React.ReactNode }) {
+  const store = useAppStore()
+  if (!store.focusMode) return <>{children}</>
+  return (
+    <div className="fixed inset-0 z-[60] bg-[#0e0f13] animate-fadeIn">
+      <div className="h-12 border-b border-white/10 flex items-center px-4 gap-3 bg-[#0e0f13]/80 backdrop-blur">
+        <Badge className="bg-[#7c9cff]/20 text-[#7c9cff] border-0 text-xs">🎯 Focus Mode</Badge>
+        <div className="flex-1" />
+        <span className="text-xs text-muted-foreground">{store.userName}</span>
+        <Button variant="ghost" size="sm" onClick={() => store.setFocusMode(false)}
+          className="text-muted-foreground hover:text-foreground text-xs btn-hover">
+          <X className="w-4 h-4 mr-1" /> Exit Focus
+        </Button>
+      </div>
+      <div className="flex-1 overflow-auto" style={{ height: 'calc(100vh - 48px)' }}>
+        <ChatSessionView />
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================
+   BOOKMARKS MODAL
+   ======================================================================== */
+function BookmarksModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const store = useAppStore()
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-[100] flex items-start justify-center pt-[15vh]" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-lg bg-[#191c23]/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-fadeInUp"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+          <span className="font-semibold text-sm">⭐ Bookmarked Messages</span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="max-h-80 overflow-y-auto custom-scrollbar p-3">
+          {store.bookmarkedMessages.length === 0 && (
+            <p className="text-center text-muted-foreground text-sm py-6">No bookmarks yet. Star a message to save it.</p>
+          )}
+          {store.bookmarkedMessages.map(msg => (
+            <div key={msg.id} className="bg-white/5 border border-white/5 rounded-lg p-3 mb-2">
+              <p className="text-sm text-foreground/90 whitespace-pre-wrap line-clamp-4">{msg.content}</p>
+              <div className="flex items-center justify-between mt-2">
+                <span className="text-[10px] text-muted-foreground">{timeAgo(msg.timestamp)}</span>
+                <button onClick={() => store.removeBookmark(msg.id)} className="text-[10px] text-[#ff8a8a] hover:underline">Remove</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================
    LANDING / SIGN UP SCREEN (Enhanced)
    ======================================================================== */
 function LandingScreen() {
@@ -732,7 +969,7 @@ function LandingScreen() {
       <div className="text-center max-w-2xl mx-auto mb-8 animate-fadeInUp relative z-10">
         <Orb />
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v5.0 AGENTIC
+          v6.0 AGENTIC
         </Badge>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4">
           sit with me
@@ -1342,6 +1579,7 @@ function ChatSessionView() {
   const store = useAppStore()
   const [input, setInput] = useState('')
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const [showBookmarks, setShowBookmarks] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -1439,15 +1677,24 @@ function ChatSessionView() {
               <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
                 {timeAgo(msg.timestamp)}
               </div>
-              {/* Copy button on assistant messages */}
+              {/* Copy & Bookmark buttons on assistant messages */}
               {msg.role === 'assistant' && (
-                <button
-                  onClick={() => copyToClipboard(msg.content, i)}
-                  className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
-                >
-                  {copiedIdx === i ? <CheckCheck className="w-3 h-3 text-[#5fd0a0]" /> : <Copy className="w-3 h-3" />}
-                  {copiedIdx === i ? 'Copied' : 'Copy'}
-                </button>
+                <div className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
+                  <button
+                    onClick={() => copyToClipboard(msg.content, i)}
+                    className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
+                  >
+                    {copiedIdx === i ? <CheckCheck className="w-3 h-3 text-[#5fd0a0]" /> : <Copy className="w-3 h-3" />}
+                    {copiedIdx === i ? 'Copied' : 'Copy'}
+                  </button>
+                  <button onClick={() => {
+                    const isBookmarked = store.bookmarkedMessages.some(b => b.id === `msg-${i}`)
+                    if (isBookmarked) store.removeBookmark(`msg-${i}`)
+                    else store.addBookmark({ id: `msg-${i}`, content: msg.content, timestamp: msg.timestamp })
+                  }} className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] flex items-center gap-1 ${store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? 'text-[#ffce6b]' : 'text-muted-foreground'}`}>
+                    <Star className="w-3 h-3" fill={store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? '#ffce6b' : 'none'} />
+                  </button>
+                </div>
               )}
             </div>
             {msg.role === 'user' && (
@@ -1479,6 +1726,9 @@ function ChatSessionView() {
           </div>
           {/* Quick-action Chips */}
           <div className="flex flex-wrap gap-1.5 mt-2">
+            <button onClick={() => setShowBookmarks(true)} className="text-[11px] text-[#ffce6b] bg-[#ffce6b]/10 border border-[#ffce6b]/20 rounded-full px-2.5 py-1 hover:bg-[#ffce6b]/20 transition-colors">
+              ⭐ {store.bookmarkedMessages.length}
+            </button>
             {quickChips.map(chip => (
               <button
                 key={chip}
@@ -1491,6 +1741,7 @@ function ChatSessionView() {
           </div>
         </div>
       </div>
+      <BookmarksModal open={showBookmarks} onClose={() => setShowBookmarks(false)} />
     </div>
   )
 }
@@ -2394,7 +2645,7 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v5')
+    localStorage.removeItem('sitwithme-v6')
     window.location.reload()
   }
 
@@ -2470,7 +2721,7 @@ function SettingsView() {
 
           <Separator className="bg-[#272b34]" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 5.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 6.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -2585,7 +2836,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v5.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v6.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -2613,6 +2864,10 @@ function MainApp() {
             <Search className="w-3 h-3" />
             <span>Search</span>
             <kbd className="text-[9px] bg-[#0e0f13] border border-[#272b34] rounded px-1 py-0.5">⌘K</kbd>
+          </button>
+          {/* Focus Mode */}
+          <button onClick={() => store.setFocusMode(true)} className="hidden sm:flex items-center gap-1 text-[11px] text-muted-foreground/50 hover:text-[#7c9cff] transition-colors bg-[#191c23]/50 backdrop-blur border border-white/5 rounded-md px-2 py-1" title="Focus Mode (Ctrl+Shift+F)">
+            <Target className="w-3 h-3" /> Focus
           </button>
           {/* Notification Center */}
           <NotificationCenter />
@@ -2684,6 +2939,10 @@ function MainApp() {
           </aside>
         </div>
       )}
+
+      {/* Pomodoro Widget & Confetti */}
+      <PomodoroWidget />
+      <ConfettiEffect />
     </div>
   )
 }
@@ -2710,6 +2969,8 @@ export default function Home() {
         {currentView === 'googleconnect' && <GoogleConnectScreen />}
         {currentView === 'app' && <MainApp />}
       </div>
+      {/* Focus Mode - rendered at root level so it overlays everything */}
+      {currentView === 'app' && <FocusModeOverlay />}
     </main>
   )
 }

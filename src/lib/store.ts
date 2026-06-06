@@ -45,6 +45,28 @@ export interface Notification {
   read: boolean
 }
 
+export interface LearningResource {
+  id: string
+  title: string
+  type: 'video' | 'article' | 'interactive' | 'podcast'
+  source: string
+  difficulty: string
+  url?: string
+}
+
+export interface BookmarkedMessage {
+  id: string
+  content: string
+  timestamp: number
+}
+
+export interface PomodoroState {
+  running: boolean
+  timeLeft: number
+  sessionsCompleted: number
+  mode: 'work' | 'break'
+}
+
 interface AppState {
   // Navigation
   currentView: AppView
@@ -115,6 +137,31 @@ interface AppState {
 
   // Task Filter
   taskFilter: 'all' | 'active' | 'completed'
+
+  // Pomodoro
+  pomodoroState: PomodoroState
+  setPomodoroState: (state: Partial<PomodoroState>) => void
+
+  // Learning Resources
+  learningResources: LearningResource[]
+  setLearningResources: (resources: LearningResource[]) => void
+
+  // Bookmarks
+  bookmarkedMessages: BookmarkedMessage[]
+  addBookmark: (msg: BookmarkedMessage) => void
+  removeBookmark: (id: string) => void
+
+  // Confetti
+  confettiActive: boolean
+  triggerConfetti: () => void
+
+  // Focus Mode
+  focusMode: boolean
+  setFocusMode: (mode: boolean) => void
+
+  // Theme
+  theme: 'dark' | 'light'
+  setTheme: (theme: 'dark' | 'light') => void
 
   // Actions
   setView: (view: AppView) => void
@@ -242,6 +289,35 @@ export const useAppStore = create<AppState>()(
       // Task Filter
       taskFilter: 'all' as const,
 
+      // Pomodoro
+      pomodoroState: { running: false, timeLeft: 25 * 60, sessionsCompleted: 0, mode: 'work' as const },
+      setPomodoroState: (state) => set((s) => ({ pomodoroState: { ...s.pomodoroState, ...state } })),
+
+      // Learning Resources
+      learningResources: [],
+      setLearningResources: (resources) => set({ learningResources: resources }),
+
+      // Bookmarks
+      bookmarkedMessages: [],
+      addBookmark: (msg) => set((s) => ({
+        bookmarkedMessages: s.bookmarkedMessages.some(b => b.id === msg.id) ? s.bookmarkedMessages : [...s.bookmarkedMessages, msg],
+      })),
+      removeBookmark: (id) => set((s) => ({
+        bookmarkedMessages: s.bookmarkedMessages.filter(b => b.id !== id),
+      })),
+
+      // Confetti
+      confettiActive: false,
+      triggerConfetti: () => set({ confettiActive: true }),
+
+      // Focus Mode
+      focusMode: false,
+      setFocusMode: (mode) => set({ focusMode: mode }),
+
+      // Theme
+      theme: 'dark' as const,
+      setTheme: (theme) => set({ theme }),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -266,7 +342,9 @@ export const useAppStore = create<AppState>()(
         chatMessages: [], onboardingMessages: [], onboardingDone: false,
         tasks: [], planWeek: null, planSummary: null, profile: null,
         notifications: [], planDayProgress: {}, taskFilter: 'all' as const,
-        currentView: 'landing',
+        pomodoroState: { running: false, timeLeft: 25 * 60, sessionsCompleted: 0, mode: 'work' as const },
+        learningResources: [], bookmarkedMessages: [], focusMode: false,
+        confettiActive: false, currentView: 'landing',
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -337,7 +415,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v5',
+      name: 'sitwithme-v6',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -377,6 +455,11 @@ export const useAppStore = create<AppState>()(
         planDayProgress: state.planDayProgress,
         taskFilter: state.taskFilter,
         tasks: state.tasks,
+        pomodoroState: state.pomodoroState,
+        learningResources: state.learningResources,
+        bookmarkedMessages: state.bookmarkedMessages,
+        focusMode: state.focusMode,
+        theme: state.theme,
       }),
     }
   )

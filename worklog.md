@@ -109,3 +109,80 @@ Stage Summary:
 - New features verified: Achievement badges, weekly heatmap, notification center, keyboard shortcuts, daily check-in, chat timestamps, task filters, plan day progress, export plan
 - Remaining risk: agent-browser requires JS eval for some button clicks (not a real user issue)
 - Next phase recommendations: Auto-task extraction from conversations, Google Calendar push, voice TTS, Hugging Face deployment
+
+---
+Task ID: 4
+Agent: Cron Review Agent (Round 4)
+Task: QA Testing, Major Feature Additions (Pomodoro, Focus Mode, Bookmarks, Confetti), Styling Enhancements
+
+Work Log:
+- Read worklog.md — v5.0 agentic was stable with all features working
+- Performed QA testing with agent-browser: Landing → Signup → Onboarding → Profile → Google Connect → Main App
+- All 7 tabs verified working: Session, Plan, Tasks, Progress, Think Space, Room, Settings
+- Room view now properly fetching messages via GET (previous fix confirmed)
+- No server errors in dev.log, clean lint
+
+New Features Implemented:
+1. **🍅 Pomodoro Focus Timer**: Floating bottom-right widget with collapsed/expanded states, 25-min work / 5-min break modes, Web Audio API chime on completion, 4-session cycle tracker, +5 XP per completed pomodoro, glassmorphism card with glow when running
+2. **🎯 Focus Mode**: Full-screen distraction-free chat overlay, activated via top bar button or Ctrl+Shift+F, shows "🎯 Focus Mode" badge, username, Exit Focus button, renders ChatSessionView in clean viewport
+3. **⭐ Chat Message Bookmarks**: Star/bookmark toggle on assistant messages (☆ → ★ gold), BookmarksModal showing saved messages with time-ago timestamps and remove button, ⭐ counter button in composer area, persists via Zustand
+4. **🎊 Confetti Effect**: Canvas-based particle animation (50 particles in app color palette), gravity + rotation physics, auto-dismiss after 3s, triggered on achievement unlock/level up
+5. **Glassmorphism CSS**: Added .glass, .glass-hover, .vignette utility classes to GlobalStyles
+6. **Version Upgrade**: All references updated from v5.0 to v6.0 agentic (landing, sidebar, settings, localStorage key)
+7. **Keyboard Shortcuts Extended**: Ctrl+Shift+F for Focus Mode, added ⇧⌘F to shortcuts modal
+
+Store Updates:
+- PomodoroState: { running, timeLeft, sessionsCompleted, mode } + setPomodoroState()
+- LearningResources array + setLearningResources()
+- BookmarkedMessages array + addBookmark/removeBookmark()
+- confettiActive boolean + triggerConfetti()
+- focusMode boolean + setFocusMode()
+- theme: 'dark'|'light' + setTheme()
+- Persist key updated to sitwithme-v6, all new fields in partialize
+
+Verification:
+- `bun run lint` — 0 errors
+- Dev server compiling cleanly
+- Pomodoro widget: expands/collapses, shows timer, Start/Reset buttons work
+- Focus Mode: renders full-screen overlay with Exit button
+- Bookmark star: visible on assistant messages, toggles gold
+- All existing functionality preserved
+
+Stage Summary:
+- App upgraded from v5.0 to v6.0 agentic
+- 7 new features/components added
+- Focus Mode rendered at root level for proper overlay behavior
+- All store fields persisted in sitwithme-v6
+- Next phase recommendations: Learning Resources Library integration, dark/light theme toggle, auto-task extraction, Google Calendar push, mobile bottom sheet for extra tabs
+
+---
+Task ID: 4a
+Agent: Full-Stack Developer
+Task: Add ConfettiEffect, PomodoroWidget, FocusModeOverlay, BookmarksModal + Integrations
+
+Work Log:
+- Read previous worklog — v5.0 app was stable with 7 tabs, command palette, chat, plan, tasks, progress, think space, room, settings
+- Confirmed Zustand store already has all required state fields (pomodoroState, learningResources, bookmarkedMessages, confettiActive, focusMode, theme) with actions
+- Store persist name already updated to `sitwithme-v6` in prior work
+
+Components Added (all placed before LandingScreen):
+1. **ConfettiEffect**: Canvas-based particle animation triggered by `confettiActive` store field. 50 colorful confetti particles with gravity, rotation, fade-out. Auto-resets after animation completes.
+2. **PomodoroWidget**: Floating bottom-right timer with collapsed (clock icon/timer) and expanded states. Supports 25min work / 5min break modes. Chime sound on completion via Web Audio API. Session tracking (4-session cycle). Awards +5 XP per completed pomodoro.
+3. **FocusModeOverlay**: Full-screen overlay wrapping main content. Shows Focus Mode badge, username, Exit Focus button. Renders ChatSessionView in full viewport.
+4. **BookmarksModal**: Modal showing bookmarked messages with content preview (line-clamp-4), timestamps, remove button. Empty state message. Opens from composer area.
+
+Integrations:
+5. **ChatSessionView - Bookmark Star**: Added star/bookmark toggle button next to Copy button on assistant messages. Gold highlight for bookmarked messages. Uses `group` hover for show/hide.
+6. **ChatSessionView - Bookmarks Button**: Added ⭐ bookmark count button in composer chip area. Opens BookmarksModal.
+7. **MainApp - PomodoroWidget & ConfettiEffect**: Added both components inside MainApp layout.
+8. **MainApp - FocusModeOverlay**: Wrapped View Content div with FocusModeOverlay component.
+9. **MainApp - Focus Mode Button**: Added Focus button with Target icon in top bar (hidden on mobile).
+10. **Keyboard Shortcut - Ctrl+Shift+F**: Added focus mode toggle to useKeyboardShortcuts hook. Added ⇧⌘F to Keyboard Shortcuts modal.
+11. **Version Update**: All v5.0 references updated to v6.0 (landing badge, sidebar footer, settings view, localStorage keys).
+12. **GlobalStyles**: Added glassmorphism helper classes (.glass, .glass-hover, .vignette).
+
+Verification:
+- `bun run lint` passed with zero errors
+- Dev server compiled successfully (✓ Compiled)
+- All existing functionality preserved
+- Store persist key already at sitwithme-v6
