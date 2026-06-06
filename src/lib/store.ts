@@ -237,6 +237,22 @@ interface AppState {
   defaultSessionDuration: 15 | 25 | 45 | 60
   setEnhancedSettings: (data: Partial<{ dailyReviewReminders: boolean; autoGenerateFlashcards: boolean; defaultSessionDuration: 15 | 25 | 45 | 60 }>) => void
 
+  // TTS / Speaking
+  currentlySpeakingId: string | null
+  setCurrentlySpeakingId: (id: string | null) => void
+
+  // Learning Streak Calendar
+  learningStreakCalendar: Record<string, boolean>
+  markDayActive: (date: string) => void
+
+  // Motivational Quote
+  motivationalQuote: string | null
+  setMotivationalQuote: (quote: string) => void
+
+  // Pomodoro Sound
+  pomodoroSound: 'chime' | 'bell' | 'digital'
+  setPomodoroSound: (sound: 'chime' | 'bell' | 'digital') => void
+
   // Actions
   setView: (view: AppView) => void
   setTab: (tab: AppTab) => void
@@ -450,6 +466,24 @@ export const useAppStore = create<AppState>()(
       defaultSessionDuration: 25 as const,
       setEnhancedSettings: (data) => set((s) => ({ ...s, ...data })),
 
+      // TTS / Speaking
+      currentlySpeakingId: null,
+      setCurrentlySpeakingId: (id) => set({ currentlySpeakingId: id }),
+
+      // Learning Streak Calendar
+      learningStreakCalendar: {},
+      markDayActive: (date) => set((s) => ({
+        learningStreakCalendar: { ...s.learningStreakCalendar, [date]: true },
+      })),
+
+      // Motivational Quote
+      motivationalQuote: null,
+      setMotivationalQuote: (quote) => set({ motivationalQuote: quote }),
+
+      // Pomodoro Sound
+      pomodoroSound: 'chime' as const,
+      setPomodoroSound: (sound) => set({ pomodoroSound: sound }),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -481,6 +515,7 @@ export const useAppStore = create<AppState>()(
         reviewCards: [], moodLogs: [], messageReactions: [],
         sessionStartTime: null,
         dailyReviewReminders: true, autoGenerateFlashcards: false, defaultSessionDuration: 25 as const,
+        currentlySpeakingId: null, learningStreakCalendar: {}, motivationalQuote: null, pomodoroSound: 'chime' as const,
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -551,7 +586,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v9',
+      name: 'sitwithme-v10',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -606,6 +641,10 @@ export const useAppStore = create<AppState>()(
         dailyReviewReminders: state.dailyReviewReminders,
         autoGenerateFlashcards: state.autoGenerateFlashcards,
         defaultSessionDuration: state.defaultSessionDuration,
+        currentlySpeakingId: state.currentlySpeakingId,
+        learningStreakCalendar: state.learningStreakCalendar,
+        motivationalQuote: state.motivationalQuote,
+        pomodoroSound: state.pomodoroSound,
       }),
     }
   )

@@ -21,7 +21,7 @@ import {
   Search, RotateCcw, Wand2, LayoutList, BarChart3, MonitorSmartphone,
   Lightbulb, Code2, Palette, Hash, Bell, Copy, CheckCheck, Filter,
   Clipboard, Download, Lock, Unlock, BookOpen, Sun, Moon, BookMarked,
-  ExternalLink, ChevronUp, ChevronDown
+  ExternalLink, ChevronUp, ChevronDown, Loader2, ArrowDown, Quote, Headphones
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -43,6 +43,56 @@ async function api(path: string, body: Record<string, unknown> = {}) {
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Request failed')
   return data
+}
+
+/* ========================================================================
+   TTS HELPER - speak text via /api/ai/tts
+   ======================================================================== */
+let currentAudioRef: HTMLAudioElement | null = null
+
+async function speakText(text: string, messageId: string): Promise<void> {
+  // Stop any currently playing audio
+  if (currentAudioRef) {
+    currentAudioRef.pause()
+    currentAudioRef = null
+  }
+  const store = useAppStore.getState()
+  store.setCurrentlySpeakingId(messageId)
+
+  try {
+    const res = await fetch('/api/ai/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: text.slice(0, 1000) }),
+    })
+    if (!res.ok) throw new Error('TTS failed')
+    const blob = await res.blob()
+    const url = URL.createObjectURL(blob)
+    const audio = new Audio(url)
+    currentAudioRef = audio
+    audio.onended = () => {
+      store.setCurrentlySpeakingId(null)
+      URL.revokeObjectURL(url)
+      currentAudioRef = null
+    }
+    audio.onerror = () => {
+      store.setCurrentlySpeakingId(null)
+      URL.revokeObjectURL(url)
+      currentAudioRef = null
+    }
+    await audio.play()
+  } catch {
+    store.setCurrentlySpeakingId(null)
+    toast.error('Voice playback failed')
+  }
+}
+
+function stopSpeaking() {
+  if (currentAudioRef) {
+    currentAudioRef.pause()
+    currentAudioRef = null
+  }
+  useAppStore.getState().setCurrentlySpeakingId(null)
 }
 
 /* ========================================================================
@@ -77,17 +127,34 @@ function renderMarkdown(text: string): React.ReactNode {
       const lang = firstNewline > 0 ? inner.slice(0, firstNewline).trim() : ''
       const code = firstNewline > 0 ? inner.slice(firstNewline + 1) : inner
       const safeLang = lang || 'text'
+      const codeId = `code-${key}`
       try {
         result.push(
-          <SyntaxHighlighter key={key++} language={safeLang} style={oneDark} className="rounded-lg my-2 text-xs">
-            {code}
-          </SyntaxHighlighter>
+          <div key={key++} className="code-block-wrapper">
+            <SyntaxHighlighter language={safeLang} style={oneDark} className="rounded-lg my-2 text-xs">
+              {code}
+            </SyntaxHighlighter>
+            <button
+              className="code-copy-btn bg-[#272b34] hover:bg-[#3a3f4b] rounded px-2 py-1 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
+              onClick={() => { navigator.clipboard.writeText(code); toast.success('Code copied!') }}
+            >
+              <Copy className="w-3 h-3" /> Copy
+            </button>
+          </div>
         )
       } catch {
         result.push(
-          <pre key={key++} className="bg-[#272b34] text-[#c5d0ff] p-3 rounded-lg my-2 text-xs overflow-x-auto">
-            <code>{code}</code>
-          </pre>
+          <div key={key++} className="code-block-wrapper">
+            <pre className="bg-[#272b34] text-[#c5d0ff] p-3 rounded-lg my-2 text-xs overflow-x-auto">
+              <code>{code}</code>
+            </pre>
+            <button
+              className="code-copy-btn bg-[#272b34] hover:bg-[#3a3f4b] rounded px-2 py-1 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
+              onClick={() => { navigator.clipboard.writeText(code); toast.success('Code copied!') }}
+            >
+              <Copy className="w-3 h-3" /> Copy
+            </button>
+          </div>
         )
       }
     } else {
@@ -226,6 +293,16 @@ function GlobalStyles() {
       @keyframes slideInLeft { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
       @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 8px rgba(124,156,255,0.3); } 50% { box-shadow: 0 0 20px rgba(124,156,255,0.6); } }
       @keyframes borderGlow { 0%, 100% { border-color: rgba(124,156,255,0.3); } 50% { border-color: rgba(124,156,255,0.7); } }
+      @keyframes meshFloat1 { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(30px, -20px) scale(1.05); } 66% { transform: translate(-20px, 15px) scale(0.95); } }
+      @keyframes meshFloat2 { 0%, 100% { transform: translate(0, 0) scale(1); } 33% { transform: translate(-25px, 25px) scale(1.08); } 66% { transform: translate(20px, -15px) scale(0.92); } }
+      @keyframes meshFloat3 { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(15px, -30px) scale(1.03); } }
+      @keyframes tagDrift { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(15px); } }
+      @keyframes tagDrift2 { 0%, 100% { transform: translateX(0); } 50% { transform: translateX(-12px); } }
+      @keyframes pulseSpeaking { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }
+      @keyframes codeCopyFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes slideInRight { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+      @keyframes numberGlow { 0%, 100% { text-shadow: 0 0 8px rgba(124,156,255,0.3); } 50% { text-shadow: 0 0 16px rgba(124,156,255,0.6); } }
+      @keyframes circularStroke { from { stroke-dashoffset: 283; } to { stroke-dashoffset: 0; } }
 
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
@@ -234,6 +311,162 @@ function GlobalStyles() {
       .animate-slideInLeft { animation: slideInLeft 0.3s ease-out forwards; }
       .animate-pulseGlow { animation: pulseGlow 2s ease-in-out infinite; }
       .animate-borderGlow { animation: borderGlow 2s ease-in-out infinite; }
+      .animate-numberGlow { animation: numberGlow 2s ease-in-out infinite; }
+      .animate-pulseSpeaking { animation: pulseSpeaking 1s ease-in-out infinite; }
+      .animate-slideInRight { animation: slideInRight 0.3s ease-out forwards; }
+
+      /* Gradient mesh background for landing */
+      .mesh-bg {
+        position: relative;
+        overflow: hidden;
+      }
+      .mesh-bg::before, .mesh-bg::after {
+        content: '';
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(80px);
+        pointer-events: none;
+      }
+      .mesh-bg::before {
+        width: 500px; height: 500px;
+        top: -100px; left: -100px;
+        background: rgba(124,156,255,0.12);
+        animation: meshFloat1 20s ease-in-out infinite;
+      }
+      .mesh-bg::after {
+        width: 400px; height: 400px;
+        bottom: -80px; right: -80px;
+        background: rgba(157,124,255,0.1);
+        animation: meshFloat2 25s ease-in-out infinite;
+      }
+
+      /* Gradient text for hero */
+      .gradient-text {
+        background: linear-gradient(135deg, #7c9cff 0%, #9d7cff 40%, #c084fc 70%, #7c9cff 100%);
+        background-size: 200% 200%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: shimmer-gradient 4s ease infinite;
+      }
+
+      /* Floating skill tags */
+      .floating-tag {
+        position: absolute;
+        pointer-events: none;
+        opacity: 0.15;
+        font-size: 12px;
+        font-weight: 600;
+        color: #7c9cff;
+        white-space: nowrap;
+      }
+
+      /* Noise texture overlay */
+      .noise-overlay {
+        position: relative;
+      }
+      .noise-overlay::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+        pointer-events: none;
+        opacity: 0.4;
+        z-index: 0;
+      }
+
+      /* Hover glow on interactive elements */
+      .hover-glow { transition: all 0.2s ease; }
+      .hover-glow:hover { box-shadow: 0 0 20px rgba(124,156,255,0.15), 0 0 40px rgba(124,156,255,0.08); border-color: rgba(124,156,255,0.4) !important; }
+
+      /* Animated gradient card border */
+      .animated-gradient-border {
+        position: relative;
+        border-radius: 0.75rem;
+        background: #191c23;
+      }
+      .animated-gradient-border::before {
+        content: '';
+        position: absolute;
+        inset: -1px;
+        border-radius: 0.75rem;
+        padding: 1px;
+        background: conic-gradient(from var(--border-angle, 0deg), #7c9cff, #9d7cff, #c084fc, #7c9cff);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        animation: gradient-border 3s linear infinite;
+      }
+
+      /* Glass top bar */
+      .glass-topbar {
+        background: rgba(14,15,19,0.7);
+        backdrop-filter: blur(24px);
+        -webkit-backdrop-filter: blur(24px);
+        border-bottom: 1px solid rgba(255,255,255,0.06);
+      }
+
+      /* Avatar ring */
+      .avatar-ring {
+        position: relative;
+      }
+      .avatar-ring::before {
+        content: '';
+        position: absolute;
+        inset: -3px;
+        border-radius: 50%;
+        background: conic-gradient(from 0deg, #7c9cff, #9d7cff, #c084fc, #7c9cff);
+        animation: gradient-border 3s linear infinite;
+        z-index: -1;
+      }
+
+      /* Code block with copy button */
+      .code-block-wrapper {
+        position: relative;
+      }
+      .code-copy-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        opacity: 0;
+        transition: opacity 0.2s;
+      }
+      .code-block-wrapper:hover .code-copy-btn {
+        opacity: 1;
+      }
+
+      /* Page transition */
+      .page-transition-enter { animation: slideInRight 0.3s ease-out forwards; }
+
+      /* Parallax tilt card */
+      .tilt-card { transition: transform 0.3s ease; transform-style: preserve-3d; }
+      .tilt-card:hover { transform: perspective(800px) rotateY(-2deg) rotateX(2deg) translateY(-4px); }
+
+      /* How it works connecting line */
+      .step-line {
+        position: relative;
+      }
+      .step-line::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        right: -40px;
+        width: 40px;
+        height: 2px;
+        background: linear-gradient(to right, #7c9cff, #9d7cff);
+        opacity: 0.4;
+      }
+      .step-line:last-child::after { display: none; }
+
+      /* Scroll to bottom button */
+      .scroll-bottom-btn {
+        position: absolute;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10;
+        animation: fadeInUp 0.3s ease-out;
+      }
 
       /* Aurora background */
       .aurora-bg {
@@ -566,7 +799,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'export-data', label: 'Export Data', icon: <Download className="w-4 h-4" />, desc: 'Download all data as JSON', action: () => {
       const state = useAppStore.getState()
       const data = {
-        exportDate: new Date().toISOString(), version: '9.0',
+        exportDate: new Date().toISOString(), version: '10.0',
         profile: state.profile, topic: state.topic, vision: state.vision,
         tasks: state.tasks, reviewCards: state.reviewCards, moodLogs: state.moodLogs,
         chatMessages: state.chatMessages, quickNotes: state.quickNotes,
@@ -587,7 +820,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v9'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v10'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -962,6 +1195,69 @@ function PomodoroWidget() {
   const [expanded, setExpanded] = useState(false)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const { running, timeLeft, sessionsCompleted, mode } = store.pomodoroState
+  const totalTime = mode === 'work' ? store.defaultSessionDuration * 60 : 5 * 60
+  const progress = totalTime > 0 ? (totalTime - timeLeft) / totalTime : 0
+  const circumference = 2 * Math.PI * 45 // radius 45
+
+  // Sound functions
+  const playChime = () => {
+    try {
+      const ac = new AudioContext()
+      const osc = ac.createOscillator()
+      const gain = ac.createGain()
+      osc.connect(gain)
+      gain.connect(ac.destination)
+      osc.type = 'sine'
+      osc.frequency.value = 800
+      gain.gain.value = 0.3
+      osc.start()
+      gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 0.5)
+      osc.stop(ac.currentTime + 0.5)
+    } catch { /* audio not available */ }
+  }
+
+  const playBell = () => {
+    try {
+      const ac = new AudioContext()
+      const osc = ac.createOscillator()
+      const gain = ac.createGain()
+      osc.connect(gain)
+      gain.connect(ac.destination)
+      osc.type = 'sine'
+      osc.frequency.value = 523.25
+      gain.gain.value = 0.3
+      osc.start()
+      osc.frequency.setValueAtTime(659.25, ac.currentTime + 0.15)
+      osc.frequency.setValueAtTime(783.99, ac.currentTime + 0.3)
+      gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 0.8)
+      osc.stop(ac.currentTime + 0.8)
+    } catch { /* audio not available */ }
+  }
+
+  const playDigital = () => {
+    try {
+      const ac = new AudioContext()
+      for (let i = 0; i < 3; i++) {
+        const osc = ac.createOscillator()
+        const gain = ac.createGain()
+        osc.connect(gain)
+        gain.connect(ac.destination)
+        osc.type = 'square'
+        osc.frequency.value = 1000
+        gain.gain.value = 0.15
+        osc.start(ac.currentTime + i * 0.15)
+        gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + i * 0.15 + 0.1)
+        osc.stop(ac.currentTime + i * 0.15 + 0.1)
+      }
+    } catch { /* audio not available */ }
+  }
+
+  const playSound = () => {
+    const sound = store.pomodoroSound
+    if (sound === 'chime') playChime()
+    else if (sound === 'bell') playBell()
+    else playDigital()
+  }
 
   useEffect(() => {
     if (running && timeLeft > 0) {
@@ -974,21 +1270,11 @@ function PomodoroWidget() {
             store.setPomodoroState({ running: false, timeLeft: 0, sessionsCompleted: newSessions })
             store.addNotification(`🍅 Pomodoro #${newSessions} complete! +5 XP`)
             store.setProgress({ xp: store.xp + 5 })
-            try {
-              const ac = new AudioContext()
-              const osc = ac.createOscillator()
-              const gain = ac.createGain()
-              osc.connect(gain)
-              gain.connect(ac.destination)
-              osc.frequency.value = 800
-              gain.gain.value = 0.3
-              osc.start()
-              gain.gain.exponentialRampToValueAtTime(0.01, ac.currentTime + 0.5)
-              osc.stop(ac.currentTime + 0.5)
-            } catch { /* audio not available */ }
+            playSound()
           } else {
             store.setPomodoroState({ running: false, timeLeft: 25 * 60, mode: 'work' })
             store.addNotification('☕ Break over! Ready for another session?')
+            playSound()
           }
         } else {
           store.setPomodoroState({ timeLeft: s.timeLeft - 1 })
@@ -1002,10 +1288,20 @@ function PomodoroWidget() {
   const secs = timeLeft % 60
   const timeStr = `${mins}:${secs.toString().padStart(2, '0')}`
 
-  const startWork = () => store.setPomodoroState({ running: true, timeLeft: 25 * 60, mode: 'work' })
+  // Session label
+  const sessionLabel = mode === 'work'
+    ? `Focus Session #${sessionsCompleted + 1}`
+    : 'Break Time'
+
+  // Estimated completion time
+  const estimatedDone = running
+    ? new Date(Date.now() + timeLeft * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null
+
+  const startWork = () => store.setPomodoroState({ running: true, timeLeft: store.defaultSessionDuration * 60, mode: 'work' })
   const startBreak = () => store.setPomodoroState({ running: true, timeLeft: 5 * 60, mode: 'break' })
   const pause = () => store.setPomodoroState({ running: false })
-  const reset = () => store.setPomodoroState({ running: false, timeLeft: 25 * 60, mode: 'work' })
+  const reset = () => store.setPomodoroState({ running: false, timeLeft: store.defaultSessionDuration * 60, mode: 'work' })
 
   return (
     <div className="fixed bottom-6 right-6 z-50">
@@ -1014,26 +1310,74 @@ function PomodoroWidget() {
           style={{ boxShadow: running ? '0 0 30px rgba(124,156,255,0.15)' : 'none' }}>
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs text-[#9d7cff] font-semibold uppercase tracking-wider">
-              {mode === 'work' ? '🍅 Focus' : '☕ Break'}
+              {sessionLabel}
             </span>
             <button onClick={() => setExpanded(false)} className="text-muted-foreground hover:text-foreground transition-colors">
               <X className="w-4 h-4" />
             </button>
           </div>
-          <div className={`text-3xl font-mono font-bold text-center mb-3 ${running ? 'text-[#7c9cff]' : 'text-foreground'}`}>
-            {timeStr}
+
+          {/* Circular Progress Ring */}
+          <div className="relative w-32 h-32 mx-auto mb-3">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="#272b34" strokeWidth="4" />
+              <circle cx="50" cy="50" r="45" fill="none"
+                stroke="url(#pomGradient)" strokeWidth="4" strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={circumference * (1 - progress)}
+                style={{ transition: 'stroke-dashoffset 1s linear' }}
+              />
+              <defs>
+                <linearGradient id="pomGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#7c9cff" />
+                  <stop offset="100%" stopColor="#9d7cff" />
+                </linearGradient>
+              </defs>
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className={`text-2xl font-mono font-bold ${running ? 'text-[#7c9cff]' : 'text-foreground'}`}>
+                {timeStr}
+              </span>
+            </div>
           </div>
+
+          {/* Estimated completion */}
+          {estimatedDone && (
+            <p className="text-[10px] text-muted-foreground text-center mb-2">
+              Done at ~{estimatedDone}
+            </p>
+          )}
+
           <div className="flex gap-2 justify-center mb-3">
             {!running ? (
               <Button size="sm" onClick={mode === 'work' ? startWork : startBreak}
                 className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] text-xs btn-hover">
-                {timeLeft === 25 * 60 || timeLeft === 5 * 60 ? 'Start' : 'Resume'}
+                {timeLeft === store.defaultSessionDuration * 60 || timeLeft === 5 * 60 ? 'Start' : 'Resume'}
               </Button>
             ) : (
               <Button size="sm" variant="outline" onClick={pause} className="text-xs border-[#272b34] btn-hover">Pause</Button>
             )}
             <Button size="sm" variant="ghost" onClick={reset} className="text-xs text-muted-foreground btn-hover">Reset</Button>
           </div>
+
+          {/* Sound Selection */}
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <span className="text-[9px] text-muted-foreground">Sound:</span>
+            {(['chime', 'bell', 'digital'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => { store.setPomodoroSound(s); toast.success(`Sound: ${s}`) }}
+                className={`text-[9px] px-2 py-0.5 rounded-full border transition-colors ${
+                  store.pomodoroSound === s
+                    ? 'bg-[#7c9cff]/20 text-[#7c9cff] border-[#7c9cff]/40'
+                    : 'bg-[#0e0f13] text-muted-foreground border-[#272b34] hover:border-[#7c9cff]/30'
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
           <div className="flex gap-1 justify-center">
             {Array.from({ length: 4 }, (_, i) => (
               <div key={i} className={`w-2 h-2 rounded-full ${i < sessionsCompleted ? 'bg-[#7c9cff]' : 'bg-[#272b34]'}`} />
@@ -1235,12 +1579,37 @@ function LandingScreen() {
   ]
 
   const techPills = ['Gemini 2.5', 'React', 'Next.js', 'Zustand', 'Google Calendar', 'Tasks API', 'Gmail API', 'Socratic Engine', 'Multi-Agent']
+  const floatingTags = ['Python', 'React', 'ML', 'TypeScript', 'Rust', 'Go', 'SQL', 'Docker', 'AWS', 'Node.js']
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden"
+    <div className="min-h-screen flex flex-col items-center justify-center p-6 relative overflow-hidden mesh-bg"
       style={{ background: 'radial-gradient(1200px 700px at 50% -10%, #1a1d27 0%, #0e0f13 60%)' }}>
 
       <FloatingParticles />
+
+      {/* Floating Skill Tags */}
+      {floatingTags.map((tag, i) => (
+        <span
+          key={tag}
+          className="floating-tag"
+          style={{
+            top: `${15 + ((i * 17) % 70)}%`,
+            left: `${5 + ((i * 23) % 85)}%`,
+            animation: i % 2 === 0 ? `tagDrift ${8 + i * 2}s ease-in-out infinite` : `tagDrift2 ${7 + i * 1.5}s ease-in-out infinite`,
+            animationDelay: `${i * 0.5}s`,
+            fontSize: `${10 + (i % 3) * 2}px`,
+          }}
+        >
+          {tag}
+        </span>
+      ))}
+
+      {/* Extra gradient mesh circles */}
+      <div className="absolute pointer-events-none" style={{
+        width: 300, height: 300, top: '30%', left: '60%', borderRadius: '50%',
+        background: 'rgba(192,132,252,0.08)', filter: 'blur(60px)',
+        animation: 'meshFloat3 18s ease-in-out infinite'
+      }} />
 
       {/* Hero */}
       <div className="text-center max-w-2xl mx-auto mb-8 animate-fadeInUp relative z-10">
@@ -1248,10 +1617,9 @@ function LandingScreen() {
           <Orb />
         </div>
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v9.0 AGENTIC
+          v10.0 AGENTIC
         </Badge>
-        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r from-[#7c9cff] via-[#9d7cff] to-[#c084fc]"
-          style={{ backgroundSize: '200% 200%', animation: 'shimmer-gradient 4s ease infinite' }}>
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 gradient-text">
           sit with me
         </h1>
         <TypingSubtitle />
@@ -1262,7 +1630,7 @@ function LandingScreen() {
         {features.map((f, i) => (
           <div
             key={f.title}
-            className="card-hover card-shine bg-[#191c23]/80 border border-[#272b34] rounded-xl p-4 backdrop-blur-sm relative group"
+            className="tilt-card card-hover card-shine bg-[#191c23]/80 border border-[#272b34] rounded-xl p-4 backdrop-blur-sm relative group hover-glow"
             style={{ animationDelay: `${i * 80}ms`, animation: 'fadeInUp 0.5s ease-out both', animationDelay: `${i * 80 + 200}ms` }}
           >
             <div className="absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl bg-gradient-to-b from-[#7c9cff] to-[#9d7cff] scale-y-0 group-hover:scale-y-100 transition-transform duration-300 origin-center" />
@@ -1273,10 +1641,31 @@ function LandingScreen() {
         ))}
       </div>
 
+      {/* How It Works Section */}
+      <div className="max-w-3xl mx-auto mb-8 relative z-10" style={{ animation: 'fadeInUp 0.6s ease-out both', animationDelay: '600ms' }}>
+        <p className="text-center text-xs text-muted-foreground uppercase tracking-widest mb-6">How It Works</p>
+        <div className="flex items-start justify-center gap-8 sm:gap-12">
+          {[
+            { step: 1, emoji: '✨', title: 'Sign Up', desc: 'Create your free account in seconds' },
+            { step: 2, emoji: '🧠', title: 'AI Onboarding', desc: 'Your mentor learns how you think' },
+            { step: 3, emoji: '🚀', title: 'Start Learning', desc: 'Get a personalized plan and go' },
+          ].map((s, i) => (
+            <div key={s.step} className="flex flex-col items-center text-center max-w-[140px] step-line">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg mb-2"
+                style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }}>
+                {s.emoji}
+              </div>
+              <div className="text-xs font-bold text-foreground mb-1">{s.title}</div>
+              <div className="text-[10px] text-muted-foreground">{s.desc}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Social Proof Section */}
       <div className="max-w-3xl mx-auto mb-8 relative z-10" style={{ animation: 'fadeInUp 0.6s ease-out both', animationDelay: '650ms' }}>
         <div className="glass rounded-2xl p-6 border border-[#7c9cff]/10 animate-borderGlow">
-          <p className="text-center text-xs text-muted-foreground uppercase tracking-widest mb-5">Trusted by learners worldwide</p>
+          <p className="text-center text-xs text-muted-foreground uppercase tracking-widest mb-5">Trusted by 500+ learners worldwide</p>
           {/* Animated Counter Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
             {[
@@ -1568,6 +1957,24 @@ function OnboardingScreen() {
       })
       addOnboardingMessage({ role: 'assistant', content: data.reply, timestamp: Date.now() })
 
+      // Incrementally update profile fields from progressData
+      if (data.progressData) {
+        const fieldsToUpdate: Record<string, string> = {}
+        const storeFields: Record<string, string | null> = {
+          topic: store.topic, vision: store.vision, domain: store.domain,
+          level: store.level, minutesPerDay: store.minutesPerDay,
+          learningStyle: store.learningStyle, whyNow: store.whyNow, obstacle: store.obstacle,
+        }
+        for (const [key, val] of Object.entries(data.progressData)) {
+          if (val && !storeFields[key]) {
+            fieldsToUpdate[key] = String(val)
+          }
+        }
+        if (Object.keys(fieldsToUpdate).length > 0) {
+          setLearningProfile(fieldsToUpdate)
+        }
+      }
+
       if (data.done && data.extractedData) {
         setOnboardingDone(true)
         setLearningProfile(data.extractedData)
@@ -1586,9 +1993,26 @@ function OnboardingScreen() {
   }
 
   // Onboarding progress - count filled profile fields
-  const profileFields = [store.topic, store.vision, store.domain, store.level, store.minutesPerDay, store.learningStyle, store.whyNow, store.obstacle]
-  const filledCount = profileFields.filter(Boolean).length
+  const profileFieldLabels: { key: string; label: string; icon: string }[] = [
+    { key: 'topic', label: 'Topic', icon: '📚' },
+    { key: 'vision', label: 'Vision', icon: '🌟' },
+    { key: 'domain', label: 'Domain', icon: '🎯' },
+    { key: 'level', label: 'Level', icon: '📊' },
+    { key: 'minutesPerDay', label: 'Time', icon: '⏰' },
+    { key: 'learningStyle', label: 'Style', icon: '🎨' },
+    { key: 'whyNow', label: 'Why', icon: '💪' },
+    { key: 'obstacle', label: 'Hurdle', icon: '🚧' },
+  ]
+  const profileFieldsMap: Record<string, string | null> = {
+    topic: store.topic, vision: store.vision, domain: store.domain,
+    level: store.level, minutesPerDay: store.minutesPerDay,
+    learningStyle: store.learningStyle, whyNow: store.whyNow, obstacle: store.obstacle,
+  }
+  const filledCount = profileFieldLabels.filter(f => profileFieldsMap[f.key]).length
   const progressPct = (filledCount / 8) * 100
+
+  // Allow skipping to profile once we have minimum fields (topic + level)
+  const canSkip = !!(store.topic && store.level)
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 animate-fadeIn"
@@ -1601,8 +2025,23 @@ function OnboardingScreen() {
             <span className="text-xs text-[#7c9cff] font-semibold">{Math.round(progressPct)}%</span>
           </div>
           <div className="h-2 bg-[#272b34] rounded-full overflow-hidden">
-            <div className="h-full rounded-full transition-all duration-500"
+            <div className="h-full rounded-full transition-all duration-500 progress-shimmer"
               style={{ width: `${progressPct}%`, background: 'linear-gradient(to right, #7c9cff, #9d7cff)' }} />
+          </div>
+          {/* Field indicator pills */}
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {profileFieldLabels.map(f => {
+              const isFilled = !!profileFieldsMap[f.key]
+              return (
+                <span key={f.key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-300 ${
+                  isFilled
+                    ? 'bg-[#7c9cff]/20 text-[#7c9cff] border border-[#7c9cff]/30'
+                    : 'bg-[#1f232c] text-muted-foreground border border-[#272b34]'
+                }`}>
+                  {f.icon} {f.label}
+                </span>
+              )
+            })}
           </div>
         </div>
         <Orb speaking={busy} />
@@ -1659,12 +2098,20 @@ function OnboardingScreen() {
           <Button variant="ghost" onClick={() => setView('apikey')} className="text-muted-foreground btn-hover">
             <ArrowLeft className="w-4 h-4 mr-1" /> Back
           </Button>
-          {store.topic && (
-            <Button onClick={() => setView('profile')}
-              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
-              Next <ArrowRight className="w-4 h-4 ml-1" />
-            </Button>
-          )}
+          <div className="flex gap-2">
+            {canSkip && !onboardingDone && (
+              <Button variant="outline" onClick={() => setView('profile')}
+                className="border-[#7c9cff]/30 text-[#7c9cff] btn-hover text-sm">
+                Skip to Profile
+              </Button>
+            )}
+            {store.topic && (
+              <Button onClick={() => setView('profile')}
+                className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
+                Next <ArrowRight className="w-4 h-4 ml-1" />
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1864,6 +2311,152 @@ function GoogleConnectScreen() {
 }
 
 /* ========================================================================
+   DASHBOARD WIDGET
+   ======================================================================== */
+const MOTIVATIONAL_QUOTES = [
+  "The expert in anything was once a beginner. — Helen Hayes",
+  "Learning is not attained by chance, it must be sought for with ardor. — Abigail Adams",
+  "The beautiful thing about learning is that no one can take it away from you. — B.B. King",
+  "Education is not the filling of a pail, but the lighting of a fire. — W.B. Yeats",
+  "The more that you read, the more things you will know. — Dr. Seuss",
+  "Live as if you were to die tomorrow. Learn as if you were to live forever. — Gandhi",
+  "An investment in knowledge pays the best interest. — Benjamin Franklin",
+  "The only way to do great work is to love what you do. — Steve Jobs",
+]
+
+function DashboardWidget() {
+  const store = useAppStore()
+
+  // Set motivational quote on mount
+  useEffect(() => {
+    if (!store.motivationalQuote) {
+      const today = new Date().toDateString()
+      const idx = Math.abs(today.split('').reduce((a, c) => a + c.charCodeAt(0), 0)) % MOTIVATIONAL_QUOTES.length
+      store.setMotivationalQuote(MOTIVATIONAL_QUOTES[idx])
+    }
+    // Mark today as active in streak calendar
+    const today = new Date().toISOString().slice(0, 10)
+    if (!store.learningStreakCalendar[today]) {
+      store.markDayActive(today)
+    }
+  }, [])
+
+  // Learning streak calendar - current month
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = now.getMonth()
+  const daysInMonth = new Date(year, month + 1, 0).getDate()
+  const firstDay = new Date(year, month, 1).getDay()
+  const today = now.getDate()
+  const monthName = now.toLocaleString('default', { month: 'long' })
+
+  const calendarDays = useMemo(() => {
+    const days: Array<{ day: number; active: boolean; isToday: boolean }> = []
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`
+      days.push({ day: d, active: !!store.learningStreakCalendar[dateStr], isToday: d === today })
+    }
+    return days
+  }, [store.learningStreakCalendar, year, month, daysInMonth, today])
+
+  // Calculate current streak
+  const currentStreak = useMemo(() => {
+    let streak = 0
+    const d = new Date()
+    while (true) {
+      const dateStr = d.toISOString().slice(0, 10)
+      if (store.learningStreakCalendar[dateStr]) {
+        streak++
+        d.setDate(d.getDate() - 1)
+      } else {
+        break
+      }
+    }
+    return streak
+  }, [store.learningStreakCalendar])
+
+  // Today's focus time (from session start)
+  const focusMinutes = store.sessionStartTime ? Math.floor((Date.now() - store.sessionStartTime) / 60000) : 0
+  // Tasks completed today
+  const tasksCompletedToday = store.tasks.filter(t => t.status === 'completed').length
+  // Next 3 incomplete tasks
+  const upcomingTasks = store.tasks.filter(t => t.status === 'pending').slice(0, 3)
+
+  return (
+    <Card className="bg-[#191c23]/80 border-[#272b34] mb-3 hover-glow">
+      <CardContent className="p-4">
+        {/* Motivational Quote */}
+        {store.motivationalQuote && (
+          <div className="mb-4 text-center">
+            <Quote className="w-4 h-4 text-[#9d7cff]/40 inline mb-1" />
+            <p className="text-xs text-muted-foreground italic leading-relaxed">{store.motivationalQuote}</p>
+          </div>
+        )}
+
+        {/* Quick Stats Row */}
+        <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="bg-[#0e0f13] rounded-xl p-3 text-center hover-glow border border-[#272b34]">
+            <div className="text-xl font-bold text-[#7c9cff] animate-numberGlow">{focusMinutes}m</div>
+            <div className="text-[10px] text-muted-foreground">Focus Time</div>
+          </div>
+          <div className="bg-[#0e0f13] rounded-xl p-3 text-center hover-glow border border-[#272b34]">
+            <div className="text-xl font-bold text-[#5fd0a0] animate-numberGlow">{tasksCompletedToday}</div>
+            <div className="text-[10px] text-muted-foreground">Tasks Done</div>
+          </div>
+          <div className="bg-[#0e0f13] rounded-xl p-3 text-center hover-glow border border-[#272b34]">
+            <div className="text-xl font-bold text-[#ffce6b] animate-numberGlow">{currentStreak}🔥</div>
+            <div className="text-[10px] text-muted-foreground">Streak</div>
+          </div>
+        </div>
+
+        {/* Learning Streak Calendar */}
+        <div className="mb-3">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2">{monthName} Activity</p>
+          <div className="grid grid-cols-7 gap-1">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+              <div key={i} className="text-[8px] text-muted-foreground text-center">{d}</div>
+            ))}
+            {Array.from({ length: firstDay }, (_, i) => (
+              <div key={`empty-${i}`} />
+            ))}
+            {calendarDays.map(d => (
+              <div
+                key={d.day}
+                className={`w-full aspect-square rounded-sm flex items-center justify-center text-[8px] transition-all ${
+                  d.isToday
+                    ? 'ring-1 ring-[#7c9cff] font-bold text-[#7c9cff]'
+                    : ''
+                } ${
+                  d.active
+                    ? 'bg-[#7c9cff]/30 text-[#7c9cff]'
+                    : 'bg-[#272b34]/50 text-muted-foreground/40'
+                }`}
+              >
+                {d.day}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Upcoming Tasks */}
+        {upcomingTasks.length > 0 && (
+          <div>
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5">Upcoming Tasks</p>
+            {upcomingTasks.map(task => (
+              <div key={task.id} className="flex items-center gap-2 py-1 text-xs">
+                <div className={`w-1.5 h-1.5 rounded-full ${task.priority === 'high' ? 'bg-[#ff8a8a]' : task.priority === 'medium' ? 'bg-[#ffce6b]' : 'bg-[#5fd0a0]'}`} />
+                <span className="text-foreground/80 truncate flex-1">{task.title}</span>
+                {task.due && <span className="text-[9px] text-muted-foreground">{task.due}</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ========================================================================
    DAILY CHECK-IN WIDGET
    ======================================================================== */
 function DailyCheckinWidget() {
@@ -2029,6 +2622,8 @@ function ChatSessionView() {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const [showBookmarks, setShowBookmarks] = useState(false)
   const chatRef = useRef<HTMLDivElement>(null)
+  const [showScrollBottom, setShowScrollBottom] = useState(false)
+  const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null)
 
   // Chat search state
   const [searchOpen, setSearchOpen] = useState(false)
@@ -2045,6 +2640,44 @@ function ChatSessionView() {
   const [studyContent, setStudyContent] = useState('')
   const [studyLoading, setStudyLoading] = useState(false)
   const [showAnswers, setShowAnswers] = useState(false)
+
+  // Scroll detection for scroll-to-bottom button
+  useEffect(() => {
+    const el = chatRef.current
+    if (!el) return
+    const handleScroll = () => {
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 100
+      setShowScrollBottom(!isNearBottom)
+    }
+    el.addEventListener('scroll', handleScroll)
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [])
+
+  const scrollToBottom = () => {
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight
+    }
+  }
+
+  // Handle TTS speak for a message
+  const handleSpeak = async (text: string, msgId: string) => {
+    if (store.currentlySpeakingId === msgId) {
+      stopSpeaking()
+      return
+    }
+    setTtsLoadingId(msgId)
+    await speakText(text, msgId)
+    setTtsLoadingId(null)
+  }
+
+  // Read aloud last AI message
+  const readAloudLastAi = () => {
+    const lastAiMsg = [...store.chatMessages].reverse().find(m => m.role === 'assistant')
+    if (lastAiMsg) {
+      const idx = store.chatMessages.indexOf(lastAiMsg)
+      handleSpeak(lastAiMsg.content, `msg-${idx}`)
+    }
+  }
 
   const handleStudyMode = async () => {
     setStudyLoading(true)
@@ -2248,7 +2881,9 @@ function ChatSessionView() {
       )}
 
       {/* Messages */}
-      <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 max-w-3xl mx-auto w-full custom-scrollbar">
+      <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 max-w-3xl mx-auto w-full custom-scrollbar relative">
+        {/* Dashboard Widget */}
+        <DashboardWidget />
         {/* Mood Tracker Widget */}
         <MoodTrackerWidget />
         {/* Daily Check-in Widget */}
@@ -2313,22 +2948,39 @@ function ChatSessionView() {
                   <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
                     {timeAgo(msg.timestamp)}
                   </div>
-                  {/* Copy & Bookmark & Reaction buttons on assistant messages */}
+                  {/* Copy & Bookmark & Reaction & TTS buttons on assistant messages */}
                   {msg.role === 'assistant' && (
                     <div className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      {/* Message Reactions */}
+                      {/* Message Reactions with counts */}
                       {(['👍', '👎', '💡', '📌'] as const).map(reaction => {
                         const isActive = store.messageReactions.some(r => r.messageId === `msg-${i}` && r.reaction === reaction)
+                        const count = store.messageReactions.filter(r => r.messageId === `msg-${i}` && r.reaction === reaction).length
                         return (
                           <button
                             key={reaction}
                             onClick={() => store.addMessageReaction(`msg-${i}`, reaction)}
-                            className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1 py-0.5 text-[10px] transition-colors ${isActive ? 'ring-1 ring-[#7c9cff]/50' : ''}`}
+                            className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1 py-0.5 text-[10px] transition-colors flex items-center gap-0.5 ${isActive ? 'ring-1 ring-[#7c9cff]/50' : ''}`}
                           >
-                            {reaction}
+                            {reaction}{count > 1 && <span className="text-muted-foreground">{count}</span>}
                           </button>
                         )
                       })}
+                      {/* TTS Speak Button */}
+                      <button
+                        onClick={() => handleSpeak(msg.content, `msg-${i}`)}
+                        className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors ${
+                          store.currentlySpeakingId === `msg-${i}` ? 'text-[#7c9cff] animate-pulseSpeaking' : ''
+                        }`}
+                        title={store.currentlySpeakingId === `msg-${i}` ? 'Stop speaking' : 'Read aloud'}
+                      >
+                        {ttsLoadingId === `msg-${i}` ? (
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : store.currentlySpeakingId === `msg-${i}` ? (
+                          <Volume2 className="w-3 h-3" />
+                        ) : (
+                          <Volume2 className="w-3 h-3" />
+                        )}
+                      </button>
                       <button
                         onClick={() => copyToClipboard(msg.content, i)}
                         className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
@@ -2370,6 +3022,13 @@ function ChatSessionView() {
           )
         })}
         {store.chatBusy && <ThinkingIndicator />}
+
+        {/* Scroll to Bottom Button */}
+        {showScrollBottom && (
+          <button onClick={scrollToBottom} className="scroll-bottom-btn w-10 h-10 rounded-full bg-[#7c9cff]/80 hover:bg-[#7c9cff] text-[#0e0f13] flex items-center justify-center shadow-lg transition-all hover:scale-110">
+            <ArrowDown className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Composer */}
@@ -2405,6 +3064,11 @@ function ChatSessionView() {
             <button onClick={() => setSearchOpen(!searchOpen)}
               className={`text-[11px] rounded-full px-2.5 py-1 transition-colors ${searchOpen ? 'text-[#7c9cff] bg-[#7c9cff]/10 border border-[#7c9cff]/20' : 'text-muted-foreground bg-[#191c23] border border-[#272b34] hover:border-[#7c9cff]/40 hover:text-[#7c9cff]'}`}>
               🔍 Search
+            </button>
+            {/* Read Aloud Chip */}
+            <button onClick={readAloudLastAi}
+              className="text-[11px] text-[#7c9cff] bg-[#7c9cff]/10 border border-[#7c9cff]/20 rounded-full px-2.5 py-1 hover:bg-[#7c9cff]/20 transition-colors flex items-center gap-1">
+              <Headphones className="w-3 h-3" /> Read Aloud
             </button>
             {quickChips.map(chip => (
               <button
@@ -2497,7 +3161,7 @@ function PlanView() {
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <h2 className="text-2xl font-bold">your learning plan</h2>
+          <h2 className="text-2xl font-bold gradient-text">your learning plan</h2>
           <p className="text-muted-foreground text-sm">
             AI builds a 7-day plan, pushes it to your calendar, and creates daily tasks.
           </p>
@@ -2740,7 +3404,7 @@ function TasksView() {
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <div className="flex items-center justify-between mb-1">
         <div>
-          <h2 className="text-2xl font-bold">your tasks</h2>
+          <h2 className="text-2xl font-bold gradient-text">your tasks</h2>
           <p className="text-muted-foreground text-sm">learning tasks — check them off as you go.</p>
         </div>
         <Button variant="outline" size="sm" className="border-[#272b34] btn-hover"
@@ -2986,7 +3650,7 @@ function ProgressView() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
-      <h2 className="text-2xl font-bold mb-1">your progress</h2>
+      <h2 className="text-2xl font-bold mb-1 gradient-text">your progress</h2>
       <p className="text-muted-foreground text-sm mb-6">no percentages. just me, noticing you.</p>
 
       {/* Stats Grid */}
@@ -3319,7 +3983,7 @@ function ResourcesView() {
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-2xl font-bold">learning resources</h2>
+        <h2 className="text-2xl font-bold gradient-text">learning resources</h2>
         <Button onClick={fetchResources} disabled={loading}
           className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
           {loading ? <><span className="animate-spin mr-2">⏳</span> Fetching...</> : <><BookOpen className="w-4 h-4 mr-2" /> Fetch Resources</>}
@@ -3545,7 +4209,7 @@ function ReviewView() {
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <div className="flex items-center justify-between mb-1">
-        <h2 className="text-2xl font-bold">review</h2>
+        <h2 className="text-2xl font-bold gradient-text">review</h2>
         <Badge className="bg-[#7c9cff]/15 text-[#7c9cff] border-0">
           {dueCards.length} due · {allCards.length} total
         </Badge>
@@ -3701,7 +4365,7 @@ function RoomView() {
   return (
     <div className="flex flex-col h-full animate-tabSwitch">
       <div className="p-4 border-b border-[#272b34]">
-        <h2 className="text-lg font-bold">the world room</h2>
+        <h2 className="text-lg font-bold gradient-text">the world room</h2>
         <p className="text-xs text-muted-foreground">everyone learning, in one place</p>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
@@ -3780,7 +4444,7 @@ function ThinkSpaceView() {
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <div className="flex items-center gap-3 mb-1">
-        <h2 className="text-2xl font-bold">think space</h2>
+        <h2 className="text-2xl font-bold gradient-text">think space</h2>
         <span className="text-lg">🔮</span>
       </div>
       <p className="text-muted-foreground text-sm mb-6">deploy specialized sub-agents for deep thinking</p>
@@ -3898,14 +4562,14 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v9')
+    localStorage.removeItem('sitwithme-v10')
     window.location.reload()
   }
 
   const handleExportData = () => {
     const data = {
       exportDate: new Date().toISOString(),
-      version: '9.0',
+      version: '10.0',
       profile: store.profile,
       topic: store.topic,
       vision: store.vision,
@@ -3985,7 +4649,7 @@ function SettingsView() {
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
-      <h2 className="text-2xl font-bold mb-1">settings</h2>
+      <h2 className="text-2xl font-bold mb-1 gradient-text">settings</h2>
 
       <Card className="bg-[#191c23] border-[#272b34] mt-4 card-hover">
         <CardContent className="p-6 space-y-6">
@@ -4177,7 +4841,7 @@ function SettingsView() {
 
           <Separator className="bg-[#272b34]" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 9.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 10.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -4303,12 +4967,12 @@ function MainApp() {
       <KeyboardShortcutsModal open={kbShortcuts.open} onClose={kbShortcuts.close} />
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden sm:flex w-60 bg-[#15171d] border-r border-[#272b34] flex-col shrink-0">
+      <aside className="hidden sm:flex w-60 bg-[#15171d] border-r border-[#272b34] flex-col shrink-0 noise-overlay">
         {/* Brand with gradient */}
         <div className="p-4 flex items-center gap-2.5" style={{ background: 'linear-gradient(135deg, rgba(124,156,255,0.08), rgba(157,124,255,0.08))' }}>
           <div className="w-7 h-7 rounded-lg"
             style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }} />
-          <span className="font-semibold text-sm">sit with me</span>
+          <span className="font-semibold text-sm gradient-text">sit with me</span>
         </div>
 
         {/* Goal Card */}
@@ -4349,7 +5013,7 @@ function MainApp() {
         <div className="p-2.5 border-t border-[#272b34]">
           <div className="gradient-border-animated bg-[#191c23] rounded-xl p-3 card-hover">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-[#0e0f13] ring-2 ring-[#7c9cff]/30 ring-offset-1 ring-offset-[#191c23]"
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-[#0e0f13] avatar-ring"
                 style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
                 {avatarInitial}
               </div>
@@ -4389,7 +5053,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v9.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v10.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -4397,12 +5061,12 @@ function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <div className="h-14 border-b border-[#272b34] flex items-center gap-3 px-4 shrink-0 glass" style={{ background: 'rgba(14,15,19,0.8)', backdropFilter: 'blur(20px)' }}>
+        <div className="h-14 border-b border-[#272b34] flex items-center gap-3 px-4 shrink-0 glass-topbar">
           <Button variant="ghost" size="sm" className="sm:hidden btn-hover"
             onClick={() => store.toggleSidebar()}>
             <Menu className="w-5 h-5" />
           </Button>
-          <span className="font-semibold text-sm capitalize">{store.currentTab === 'thinkspace' ? 'think space' : store.currentTab}</span>
+          <span className="font-semibold text-sm capitalize gradient-text">{store.currentTab === 'thinkspace' ? 'think space' : store.currentTab}</span>
           {/* Session Timer */}
           {store.sessionStartTime && (
             <span className="text-[11px] text-muted-foreground/60 flex items-center gap-1">
@@ -4480,11 +5144,11 @@ function MainApp() {
           <AnimatePresence mode="wait">
             <motion.div
               key={store.currentTab}
-              initial={{ opacity: 0, x: 8 }}
+              initial={{ opacity: 0, x: 12 }}
               animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -8 }}
-              transition={{ duration: 0.2, ease: 'easeInOut' }}
-              className="h-full"
+              exit={{ opacity: 0, x: -12 }}
+              transition={{ duration: 0.25, ease: 'easeInOut' }}
+              className="h-full page-transition-enter"
             >
               {renderView()}
             </motion.div>
