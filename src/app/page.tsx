@@ -19,7 +19,8 @@ import {
   Key, User, ChevronRight, Volume2, VolumeX, Plus, Clock, Target,
   Zap, Star, Trophy, Flame, Eye, Mail, Check, X, Menu, Command,
   Search, RotateCcw, Wand2, LayoutList, BarChart3, MonitorSmartphone,
-  Lightbulb, Code2, Palette, Hash
+  Lightbulb, Code2, Palette, Hash, Bell, Copy, CheckCheck, Filter,
+  Clipboard, Download, Lock, Unlock
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -38,29 +39,80 @@ async function api(path: string, body: Record<string, unknown> = {}) {
 }
 
 /* ========================================================================
-   SIMPLE MARKDOWN RENDERER
+   TIME AGO HELPER
+   ======================================================================== */
+function timeAgo(ts: number): string {
+  const diff = Date.now() - ts
+  const seconds = Math.floor(diff / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+/* ========================================================================
+   IMPROVED MARKDOWN RENDERER
    ======================================================================== */
 function renderMarkdown(text: string): React.ReactNode {
-  const parts = text.split(/(\*\*.*?\*\*|`[^`]+`|\n|- )/g)
+  const lines = text.split('\n')
   const result: React.ReactNode[] = []
   let key = 0
 
-  for (const part of parts) {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      result.push(<strong key={key++} className="font-semibold text-[#c5d0ff]">{part.slice(2, -2)}</strong>)
-    } else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
-      result.push(
-        <code key={key++} className="bg-[#272b34] text-[#9d7cff] px-1.5 py-0.5 rounded text-xs font-mono">
-          {part.slice(1, -1)}
-        </code>
-      )
-    } else if (part === '\n') {
-      result.push(<br key={key++} />)
-    } else if (part === '- ') {
-      result.push(<span key={key++}>&bull; </span>)
-    } else if (part) {
-      result.push(<span key={key++}>{part}</span>)
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx]
+
+    // Handle headers
+    if (line.startsWith('### ')) {
+      result.push(<h3 key={key++} className="text-sm font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(4)}</h3>)
+      continue
     }
+    if (line.startsWith('## ')) {
+      result.push(<h2 key={key++} className="text-base font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(3)}</h2>)
+      continue
+    }
+    if (line.startsWith('# ')) {
+      result.push(<h1 key={key++} className="text-lg font-bold text-[#c5d0ff] mt-2 mb-1">{line.slice(2)}</h1>)
+      continue
+    }
+
+    // Process inline elements within the line
+    const inlineParts = line.split(/(\*\*.*?\*\*|`[^`]+`|\[([^\]]+)\]\(([^)]+)\))/g)
+    const inlineResult: React.ReactNode[] = []
+
+    for (const part of inlineParts) {
+      if (part === undefined || part === '') continue
+      if (part.startsWith('**') && part.endsWith('**')) {
+        inlineResult.push(<strong key={key++} className="font-semibold text-[#c5d0ff]">{part.slice(2, -2)}</strong>)
+      } else if (part.startsWith('`') && part.endsWith('`') && part.length > 2) {
+        inlineResult.push(
+          <code key={key++} className="bg-[#272b34] text-[#9d7cff] px-1.5 py-0.5 rounded text-xs font-mono">
+            {part.slice(1, -1)}
+          </code>
+        )
+      } else if (/^\[([^\]]+)\]\(([^)]+)\)$/.test(part)) {
+        const match = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/)
+        if (match) {
+          inlineResult.push(
+            <a key={key++} href={match[2]} target="_blank" rel="noopener noreferrer"
+              className="text-[#7c9cff] underline hover:text-[#9d7cff] transition-colors">
+              {match[1]}
+            </a>
+          )
+        }
+      } else if (part.startsWith('- ') || part === '- ') {
+        inlineResult.push(<span key={key++}>&bull; {part.slice(2)}</span>)
+      } else {
+        inlineResult.push(<span key={key++}>{part}</span>)
+      }
+    }
+
+    if (lineIdx > 0) {
+      result.push(<br key={key++} />)
+    }
+    result.push(<span key={key++}>{inlineResult}</span>)
   }
   return <>{result}</>
 }
@@ -125,15 +177,20 @@ function GlobalStyles() {
         0% { background-position: -200% 0; }
         100% { background-position: 200% 0; }
       }
+      @keyframes tabSwitch {
+        from { opacity: 0; transform: translateX(8px); }
+        to { opacity: 1; transform: translateX(0); }
+      }
 
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
       .animate-slideUp { animation: slideUp 0.35s ease-out forwards; }
+      .animate-tabSwitch { animation: tabSwitch 0.25s ease-out forwards; }
 
       .chat-bubble-enter { animation: slideUp 0.3s ease-out forwards; }
 
       .card-hover { transition: all 0.2s ease; }
-      .card-hover:hover { transform: translateY(-2px); box-shadow: 0 0 20px rgba(124,156,255,0.1); border-color: rgba(124,156,255,0.3) !important; }
+      .card-hover:hover { transform: translateY(-2px); box-shadow: 0 0 20px rgba(124,156,255,0.1), 0 0 40px rgba(124,156,255,0.05); border-color: rgba(124,156,255,0.3) !important; }
 
       .btn-hover { transition: all 0.15s ease; }
       .btn-hover:hover { transform: scale(1.03); }
@@ -150,6 +207,45 @@ function GlobalStyles() {
         border-radius: 50%;
         pointer-events: none;
         animation: floatUp linear infinite;
+      }
+
+      /* Grid pattern background */
+      .grid-bg {
+        background-image:
+          linear-gradient(rgba(124,156,255,0.03) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(124,156,255,0.03) 1px, transparent 1px);
+        background-size: 40px 40px;
+      }
+
+      /* Scroll area gradient overlay */
+      .scroll-gradient::before {
+        content: '';
+        position: sticky;
+        top: 0;
+        display: block;
+        height: 32px;
+        background: linear-gradient(to bottom, #0e0f13, transparent);
+        pointer-events: none;
+        z-index: 1;
+      }
+
+      /* Sidebar active accent border */
+      .sidebar-active {
+        border-left: 3px solid #7c9cff;
+        padding-left: 9px;
+        background: rgba(124,156,255,0.08) !important;
+      }
+      .sidebar-inactive {
+        border-left: 3px solid transparent;
+        padding-left: 9px;
+      }
+
+      /* Onboarding bubble gradient */
+      .bubble-gradient-assistant {
+        background: linear-gradient(135deg, #1d2129 0%, #1f2535 100%);
+      }
+      .bubble-gradient-user {
+        background: linear-gradient(135deg, #2c3450 0%, #2a3555 100%);
       }
     `}</style>
   )
@@ -249,7 +345,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v4'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v5'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -350,6 +446,137 @@ function useCommandPalette() {
     return () => window.removeEventListener('keydown', handleKey)
   }, [])
   return { open, setOpen, openCount, close: () => setOpen(false) }
+}
+
+/* ========================================================================
+   KEYBOARD SHORTCUTS MODAL
+   ======================================================================== */
+function KeyboardShortcutsModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (open) {
+      const handleKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose()
+      }
+      window.addEventListener('keydown', handleKey)
+      return () => window.removeEventListener('keydown', handleKey)
+    }
+  }, [open, onClose])
+
+  if (!open) return null
+
+  const shortcuts = [
+    { keys: '⌘K', desc: 'Command Palette' },
+    { keys: '⌘Enter', desc: 'Send message' },
+    { keys: '1-7', desc: 'Switch tabs' },
+    { keys: '?', desc: 'Show shortcuts' },
+    { keys: 'Esc', desc: 'Close modal/palette' },
+  ]
+
+  return (
+    <div className="fixed inset-0 z-[110] flex items-center justify-center" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div className="relative w-full max-w-sm bg-[#191c23] border border-[#272b34] rounded-xl shadow-2xl p-6 animate-fadeInUp"
+        onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">Keyboard Shortcuts</h3>
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-7 w-7 p-0">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
+        <div className="space-y-3">
+          {shortcuts.map(s => (
+            <div key={s.keys} className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">{s.desc}</span>
+              <kbd className="bg-[#0e0f13] border border-[#272b34] rounded px-2 py-1 text-xs text-foreground font-mono">
+                {s.keys}
+              </kbd>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================
+   KEYBOARD SHORTCUTS HOOK
+   ======================================================================== */
+function useKeyboardShortcuts() {
+  const [open, setOpen] = useState(false)
+  const store = useAppStore()
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      // ? to show shortcuts
+      if (e.key === '?' && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+        e.preventDefault()
+        setOpen(v => !v)
+      }
+      // Number keys 1-7 for tab switching (only when not in input)
+      if (/^[1-7]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        const target = e.target as HTMLElement
+        if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+        const tabs: AppTab[] = ['session', 'plan', 'tasks', 'progress', 'thinkspace', 'room', 'settings']
+        if (store.currentView === 'app') {
+          store.setTab(tabs[parseInt(e.key) - 1])
+        }
+      }
+      // Cmd+Enter to send
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        const sendBtn = document.querySelector('[data-send-btn]') as HTMLButtonElement
+        if (sendBtn && !sendBtn.disabled) sendBtn.click()
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [store])
+  return { open, setOpen, close: () => setOpen(false) }
+}
+
+/* ========================================================================
+   NOTIFICATION CENTER
+   ======================================================================== */
+function NotificationCenter() {
+  const store = useAppStore()
+  const [open, setOpen] = useState(false)
+  const unreadCount = store.notifications.filter(n => !n.read).length
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => { setOpen(!open); if (!open && unreadCount > 0) store.markNotificationsRead() }}
+        className="relative flex items-center justify-center w-8 h-8 rounded-lg bg-[#191c23] border border-[#272b34] hover:border-[#7c9cff]/30 transition-colors"
+      >
+        <Bell className="w-4 h-4 text-muted-foreground" />
+        {unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#ff8a8a] text-[9px] text-white flex items-center justify-center font-bold">
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+      </button>
+      {open && (
+        <div className="absolute right-0 top-10 w-72 bg-[#191c23] border border-[#272b34] rounded-xl shadow-2xl z-50 animate-fadeInUp overflow-hidden">
+          <div className="px-4 py-3 border-b border-[#272b34]">
+            <h4 className="text-sm font-semibold">Notifications</h4>
+          </div>
+          <div className="max-h-80 overflow-y-auto custom-scrollbar">
+            {store.notifications.length === 0 ? (
+              <p className="text-center text-muted-foreground text-xs py-6">No notifications yet</p>
+            ) : (
+              store.notifications.map(n => (
+                <div key={n.id} className={`px-4 py-3 border-b border-[#272b34]/50 text-xs ${!n.read ? 'bg-[#7c9cff]/5' : ''}`}>
+                  <p className="text-foreground/90">{n.text}</p>
+                  <p className="text-muted-foreground mt-1">{timeAgo(n.time)}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 /* ========================================================================
@@ -505,7 +732,7 @@ function LandingScreen() {
       <div className="text-center max-w-2xl mx-auto mb-8 animate-fadeInUp relative z-10">
         <Orb />
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v4.0 AGENTIC
+          v5.0 AGENTIC
         </Badge>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4">
           sit with me
@@ -830,10 +1057,10 @@ function OnboardingScreen() {
               )}
               <div className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
                 msg.role === 'user'
-                  ? 'bg-[#2c3450] text-foreground rounded-tr-sm'
+                  ? 'bubble-gradient-user text-foreground rounded-tr-sm'
                   : msg.role === 'system'
                     ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%]'
-                    : 'bg-[#1d2129] text-foreground rounded-tl-sm'
+                    : 'bubble-gradient-assistant text-foreground rounded-tl-sm'
               }`}>
                 {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
               </div>
@@ -1073,11 +1300,48 @@ function GoogleConnectScreen() {
 }
 
 /* ========================================================================
+   DAILY CHECK-IN WIDGET
+   ======================================================================== */
+function DailyCheckinWidget() {
+  const store = useAppStore()
+  const sessionDay = store.sessionCount + 1
+  const todayFocus = store.planWeek?.[0]?.focus || store.topic || 'your learning journey'
+  const firstStep = store.planWeek?.[0]?.firstStep || 'Start a conversation with your mentor'
+
+  return (
+    <Card className="bg-gradient-to-r from-[#7c9cff]/10 to-[#9d7cff]/10 border-[#7c9cff]/20 mb-3 card-hover">
+      <CardContent className="p-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0"
+            style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }}>
+            🌱
+          </div>
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-[#c5d0ff]">Day {sessionDay} of your learning journey</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Today&apos;s focus: <span className="text-foreground">{todayFocus}</span></p>
+            <p className="text-xs text-muted-foreground">Quick start: <span className="text-[#7c9cff]">{firstStep}</span></p>
+            <Button size="sm" className="mt-2 h-7 text-xs bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover"
+              onClick={() => {
+                store.setProgress({ sessionCount: store.sessionCount + 1 })
+                store.addNotification('🌱 Day ' + (store.sessionCount + 1) + ' session started!')
+                toast.success('Session started! Let\'s go!')
+              }}>
+              Start Today&apos;s Session
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/* ========================================================================
    CHAT SESSION VIEW (Enhanced)
    ======================================================================== */
 function ChatSessionView() {
   const store = useAppStore()
   const [input, setInput] = useState('')
+  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
   const chatRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -1120,7 +1384,11 @@ function ChatSessionView() {
           content: '💡 Tip: You can create a task from this — check the Tasks tab!',
           timestamp: Date.now(),
         })
+        store.addNotification('📋 New task extracted from your chat')
       }
+
+      // Award XP for chatting
+      store.setProgress({ xp: store.xp + 5 })
     } catch (err: unknown) {
       store.addChatMessage({
         role: 'system',
@@ -1132,6 +1400,13 @@ function ChatSessionView() {
     }
   }
 
+  const copyToClipboard = (text: string, idx: number) => {
+    navigator.clipboard.writeText(text)
+    setCopiedIdx(idx)
+    setTimeout(() => setCopiedIdx(null), 2000)
+    toast.success('Copied to clipboard')
+  }
+
   const quickChips = ['Explain simply', 'Give me a challenge', 'Plan my week', 'Create a task']
 
   return (
@@ -1141,6 +1416,9 @@ function ChatSessionView() {
 
       {/* Messages */}
       <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 max-w-3xl mx-auto w-full custom-scrollbar">
+        {/* Daily Check-in Widget */}
+        <DailyCheckinWidget />
+
         {store.chatMessages.map((msg, i) => (
           <div key={i} className={`flex gap-3 chat-bubble-enter ${msg.role === 'user' ? 'justify-end' : msg.role === 'system' ? 'justify-center' : 'justify-start'}`}>
             {msg.role === 'assistant' && (
@@ -1149,14 +1427,28 @@ function ChatSessionView() {
                 🧠
               </div>
             )}
-            <div className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm ${
+            <div className={`relative group max-w-[78%] ${
               msg.role === 'user'
-                ? 'bg-[#2c3450] text-foreground rounded-tr-sm whitespace-pre-wrap'
+                ? 'bubble-gradient-user text-foreground rounded-2xl rounded-tr-sm whitespace-pre-wrap px-4 py-3 text-sm'
                 : msg.role === 'system'
-                  ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%]'
-                  : 'bg-[#1d2129] text-foreground rounded-tl-sm'
+                  ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%] px-4 py-3 rounded-2xl'
+                  : 'bubble-gradient-assistant text-foreground rounded-2xl rounded-tl-sm px-4 py-3 text-sm'
             }`}>
               {msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content}
+              {/* Timestamp */}
+              <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
+                {timeAgo(msg.timestamp)}
+              </div>
+              {/* Copy button on assistant messages */}
+              {msg.role === 'assistant' && (
+                <button
+                  onClick={() => copyToClipboard(msg.content, i)}
+                  className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
+                >
+                  {copiedIdx === i ? <CheckCheck className="w-3 h-3 text-[#5fd0a0]" /> : <Copy className="w-3 h-3" />}
+                  {copiedIdx === i ? 'Copied' : 'Copy'}
+                </button>
+              )}
             </div>
             {msg.role === 'user' && (
               <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm bg-[#1f232c] text-muted-foreground shrink-0">
@@ -1180,7 +1472,7 @@ function ChatSessionView() {
               rows={1}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             />
-            <Button onClick={send} disabled={store.chatBusy}
+            <Button onClick={send} disabled={store.chatBusy} data-send-btn
               className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] px-4 shrink-0 btn-hover">
               <Send className="w-4 h-4" />
             </Button>
@@ -1204,7 +1496,7 @@ function ChatSessionView() {
 }
 
 /* ========================================================================
-   PLAN VIEW (Enhanced)
+   PLAN VIEW (Enhanced with day progress, export, completion toggle)
    ======================================================================== */
 function PlanView() {
   const store = useAppStore()
@@ -1217,10 +1509,41 @@ function PlanView() {
       const data = await api('/ai/plan', { sessionToken: store.sessionToken })
       setPlan(data.plan)
       store.setPlan(data.plan.summary, data.plan.week)
+      store.addNotification('📅 Your 7-day learning plan is ready!')
     } catch (err: unknown) {
       toast.error((err as Error).message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const exportPlan = () => {
+    const currentPlan = plan || store.planWeek
+    const summary = plan?.summary || store.planSummary || ''
+    if (!currentPlan) {
+      toast.error('No plan to export')
+      return
+    }
+    let text = summary + '\n\n'
+    currentPlan.forEach((day, i) => {
+      const status = store.planDayProgress[i + 1] || 'not-started'
+      const statusIcon = status === 'completed' ? '✅' : status === 'in-progress' ? '🔄' : '⬜'
+      text += `${statusIcon} Day ${i + 1}: ${day.day} · ${day.focus}\n`
+      text += `   ${day.firstStep}\n`
+      text += `   Time: ${day.minutes}min${day.time ? ' · ' + day.time : ''}\n\n`
+    })
+    navigator.clipboard.writeText(text)
+    toast.success('Plan copied to clipboard!')
+  }
+
+  const toggleDayComplete = (dayIdx: number) => {
+    const current = store.planDayProgress[dayIdx] || 'not-started'
+    const newStatus = current === 'completed' ? 'not-started' : 'completed'
+    store.setPlanDayProgress(dayIdx, newStatus)
+    if (newStatus === 'completed') {
+      store.setProgress({ xp: store.xp + 20 })
+      store.addNotification(`🎯 Day ${dayIdx} completed! +20 XP`)
+      toast.success(`Day ${dayIdx} completed! +20 XP`)
     }
   }
 
@@ -1234,15 +1557,30 @@ function PlanView() {
     'from-[#fbbf24] to-[#5fd0a0]',
   ]
 
-  return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-fadeIn">
-      <h2 className="text-2xl font-bold mb-1">your learning plan</h2>
-      <p className="text-muted-foreground text-sm mb-6">
-        AI builds a 7-day plan, pushes it to your calendar, and creates daily tasks.
-      </p>
+  const statusIcons: Record<string, React.ReactNode> = {
+    'not-started': <span className="w-5 h-5 rounded border border-[#272b34] inline-block" />,
+    'in-progress': <span className="w-5 h-5 rounded border-2 border-[#ffce6b] inline-block flex items-center justify-center" />,
+    'completed': <CheckCheck className="w-5 h-5 text-[#5fd0a0]" />,
+  }
 
-      {!plan && !loading && (
-        <Card className="bg-[#191c23] border-[#272b34] card-hover">
+  return (
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h2 className="text-2xl font-bold">your learning plan</h2>
+          <p className="text-muted-foreground text-sm">
+            AI builds a 7-day plan, pushes it to your calendar, and creates daily tasks.
+          </p>
+        </div>
+        {(plan || store.planWeek) && (
+          <Button variant="outline" size="sm" className="border-[#272b34] btn-hover" onClick={exportPlan}>
+            <Clipboard className="w-3.5 h-3.5 mr-1" /> Export as Text
+          </Button>
+        )}
+      </div>
+
+      {!plan && !loading && !store.planWeek && (
+        <Card className="bg-[#191c23] border-[#272b34] card-hover mt-6">
           <CardContent className="p-8 text-center">
             <Calendar className="w-12 h-12 mx-auto mb-4 text-[#7c9cff]" />
             <h3 className="font-semibold mb-2">No plan yet</h3>
@@ -1262,56 +1600,78 @@ function PlanView() {
         </div>
       )}
 
-      {plan && !loading && (
-        <div className="space-y-4">
-          {plan.summary && (
+      {(plan || store.planWeek) && !loading && (
+        <div className="space-y-4 mt-6">
+          {(plan?.summary || store.planSummary) && (
             <Card className="bg-[#191c23] border-[#272b34] card-hover">
               <CardContent className="p-4">
-                <p className="font-semibold">{plan.summary}</p>
-                {plan.adapts && <p className="text-sm text-muted-foreground mt-1">🎯 {plan.adapts}</p>}
+                <p className="font-semibold">{plan?.summary || store.planSummary}</p>
+                {plan?.adapts && <p className="text-sm text-muted-foreground mt-1">🎯 {plan.adapts}</p>}
               </CardContent>
             </Card>
           )}
-          {plan.week?.map((day, i) => (
-            <Card key={i} className="bg-[#191c23] border-[#272b34] overflow-hidden card-hover">
-              <div className="flex">
-                {/* Left accent border */}
-                <div className={`w-1.5 shrink-0 bg-gradient-to-b ${accentColors[i % accentColors.length]}`} />
-                <CardContent className="p-4 flex-1">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-1">
-                        <span className="text-3xl font-bold bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] bg-clip-text text-transparent leading-none">
-                          {i + 1}
-                        </span>
-                        <div>
-                          <h4 className="font-semibold text-sm">{day.day} · {day.focus}</h4>
-                          {day.time && (
-                            <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
-                              <Clock className="w-3 h-3" /> {day.time}
-                            </span>
-                          )}
+          {(plan?.week || store.planWeek || []).map((day, i) => {
+            const dayStatus = store.planDayProgress[i + 1] || 'not-started'
+            const isCompleted = dayStatus === 'completed'
+            return (
+              <Card key={i} className={`bg-[#191c23] border-[#272b34] overflow-hidden card-hover transition-opacity ${isCompleted ? 'opacity-70' : ''}`}>
+                <div className="flex">
+                  {/* Left accent border */}
+                  <div className={`w-1.5 shrink-0 bg-gradient-to-b ${accentColors[i % accentColors.length]}`} />
+                  <CardContent className="p-4 flex-1">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-1">
+                          {/* Day completion toggle */}
+                          <button
+                            onClick={() => toggleDayComplete(i + 1)}
+                            className="shrink-0 hover:scale-110 transition-transform"
+                            title={isCompleted ? 'Mark as not started' : 'Mark as completed'}
+                          >
+                            {statusIcons[dayStatus]}
+                          </button>
+                          <span className="text-3xl font-bold bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] bg-clip-text text-transparent leading-none">
+                            {i + 1}
+                          </span>
+                          <div>
+                            <h4 className={`font-semibold text-sm ${isCompleted ? 'line-through text-muted-foreground' : ''}`}>{day.day} · {day.focus}</h4>
+                            {day.time && (
+                              <span className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                <Clock className="w-3 h-3" /> {day.time}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <p className={`text-sm ${isCompleted ? 'line-through text-muted-foreground' : 'text-muted-foreground'} mt-1`}>{day.firstStep}</p>
+                        {/* Status badge */}
+                        <div className="flex items-center gap-2 mt-2">
+                          <Badge className={`text-[10px] border-0 ${
+                            dayStatus === 'completed' ? 'bg-[#5fd0a0]/20 text-[#5fd0a0]' :
+                            dayStatus === 'in-progress' ? 'bg-[#ffce6b]/20 text-[#ffce6b]' :
+                            'bg-[#272b34] text-muted-foreground'
+                          }`}>
+                            {dayStatus === 'completed' ? '✅ Completed' : dayStatus === 'in-progress' ? '🔄 In Progress' : '⬜ Not Started'}
+                          </Badge>
+                        </div>
+                        {/* Per-day action buttons */}
+                        <div className="flex gap-2 mt-2">
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground hover:text-[#7c9cff] btn-hover">
+                            📅 Push to Calendar
+                          </Button>
+                          <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground hover:text-[#5fd0a0] btn-hover">
+                            ✅ Create Task
+                          </Button>
                         </div>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{day.firstStep}</p>
-                      {/* Per-day action buttons */}
-                      <div className="flex gap-2 mt-2">
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground hover:text-[#7c9cff] btn-hover">
-                          📅 Push to Calendar
-                        </Button>
-                        <Button size="sm" variant="ghost" className="h-6 text-[10px] text-muted-foreground hover:text-[#5fd0a0] btn-hover">
-                          ✅ Create Task
-                        </Button>
-                      </div>
+                      <Badge className="bg-gradient-to-r from-[#7c9cff]/20 to-[#9d7cff]/20 text-[#9d7cff] border-0 text-xs shrink-0">
+                        <Clock className="w-3 h-3 mr-1" />{day.minutes}m
+                      </Badge>
                     </div>
-                    <Badge className="bg-gradient-to-r from-[#7c9cff]/20 to-[#9d7cff]/20 text-[#9d7cff] border-0 text-xs shrink-0">
-                      <Clock className="w-3 h-3 mr-1" />{day.minutes}m
-                    </Badge>
-                  </div>
-                </CardContent>
-              </div>
-            </Card>
-          ))}
+                  </CardContent>
+                </div>
+              </Card>
+            )
+          })}
           <div className="flex gap-3 justify-center pt-2">
             <Button onClick={generatePlan} variant="outline" className="border-[#272b34] btn-hover">
               🔄 Regenerate
@@ -1327,12 +1687,13 @@ function PlanView() {
 }
 
 /* ========================================================================
-   TASKS VIEW
+   TASKS VIEW (Enhanced with priority, due date, filters, extract)
    ======================================================================== */
 function TasksView() {
   const store = useAppStore()
   const [newTask, setNewTask] = useState('')
   const [loading, setLoading] = useState(false)
+  const [extracting, setExtracting] = useState(false)
 
   const addTask = async () => {
     if (!newTask.trim()) return
@@ -1346,6 +1707,7 @@ function TasksView() {
       store.addTask(data.task)
       setNewTask('')
       toast.success('Task added ✓')
+      store.addNotification('📋 New task: ' + newTask.trim())
     } catch (err: unknown) {
       toast.error((err as Error).message)
     } finally {
@@ -1357,28 +1719,119 @@ function TasksView() {
     try {
       await api(`/tasks/${taskId}`, { sessionToken: store.sessionToken, status: 'completed' })
       store.completeTask(taskId)
-      toast.success('Done ✓')
+      store.addNotification('🎯 You earned 15 XP for completing a task!')
+      toast.success('Done ✓ +15 XP')
     } catch (err: unknown) {
       toast.error((err as Error).message)
     }
   }
 
+  const extractFromChat = async () => {
+    setExtracting(true)
+    try {
+      const lastMessages = store.chatMessages.slice(-6).map(m => m.content).join('\n')
+      const data = await api('/ai/chat', {
+        sessionToken: store.sessionToken,
+        message: `Extract actionable learning tasks from this conversation. Return each task as a line starting with "TASK:". Each line should be a concise task title. If there are due dates or priorities, add them in brackets like [high] or [due:tomorrow].\n\nConversation:\n${lastMessages}`,
+        history: [],
+        boost: false,
+      })
+      const lines = data.reply.split('\n').filter(l => l.trim().startsWith('TASK:'))
+      let added = 0
+      for (const line of lines) {
+        const text = line.replace('TASK:', '').trim()
+        if (text) {
+          let priority: 'high' | 'medium' | 'low' = 'medium'
+          let due: string | undefined
+          if (text.includes('[high]')) priority = 'high'
+          else if (text.includes('[low]')) priority = 'low'
+          const dueMatch = text.match(/\[due:([^\]]+)\]/)
+          if (dueMatch) due = dueMatch[1]
+          store.addTask({
+            id: Date.now().toString() + Math.random().toString(36).slice(2),
+            title: text.replace(/\[[^\]]+\]/g, '').trim(),
+            priority,
+            due,
+            status: 'pending',
+            source: 'ai-extracted',
+          })
+          added++
+        }
+      }
+      if (added > 0) {
+        toast.success(`Extracted ${added} task${added > 1 ? 's' : ''} from chat!`)
+        store.addNotification(`📋 ${added} task${added > 1 ? 's' : ''} extracted from chat`)
+      } else {
+        toast.info('No tasks found in recent chat messages')
+      }
+    } catch (err: unknown) {
+      toast.error((err as Error).message)
+    } finally {
+      setExtracting(false)
+    }
+  }
+
   const loadTasks = useCallback(async () => {
     try {
-      const data = await api('/tasks', { sessionToken: store.sessionToken })
+      const res = await fetch(`/api/tasks?sessionToken=${encodeURIComponent(store.sessionToken || '')}`)
+      const data = await res.json()
       if (data.tasks) store.setTasks(data.tasks)
     } catch { /* ignore */ }
   }, [store.sessionToken])
 
   useEffect(() => { loadTasks() }, [loadTasks])
 
-  const pending = store.tasks.filter(t => t.status === 'pending')
-  const completed = store.tasks.filter(t => t.status === 'completed')
+  // Filter tasks
+  const filter = store.taskFilter
+  const allPending = store.tasks.filter(t => t.status === 'pending')
+  const allCompleted = store.tasks.filter(t => t.status === 'completed')
+
+  const pending = filter === 'completed' ? [] : allPending
+  const completed = filter === 'active' ? [] : allCompleted
+
+  const priorityColors: Record<string, string> = {
+    high: 'bg-[#ff8a8a]',
+    medium: 'bg-[#ffce6b]',
+    low: 'bg-[#5fd0a0]',
+  }
+
+  const isOverdue = (due?: string) => {
+    if (!due) return false
+    try {
+      return new Date(due) < new Date()
+    } catch {
+      return false
+    }
+  }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-fadeIn">
-      <h2 className="text-2xl font-bold mb-1">your tasks</h2>
-      <p className="text-muted-foreground text-sm mb-6">learning tasks — check them off as you go.</p>
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
+      <div className="flex items-center justify-between mb-1">
+        <div>
+          <h2 className="text-2xl font-bold">your tasks</h2>
+          <p className="text-muted-foreground text-sm">learning tasks — check them off as you go.</p>
+        </div>
+        <Button variant="outline" size="sm" className="border-[#272b34] btn-hover"
+          onClick={extractFromChat} disabled={extracting}>
+          <Wand2 className="w-3.5 h-3.5 mr-1" />
+          {extracting ? 'Extracting...' : 'Extract from Chat'}
+        </Button>
+      </div>
+
+      {/* Filter Buttons */}
+      <div className="flex gap-2 mb-4 mt-4">
+        {(['all', 'active', 'completed'] as const).map(f => (
+          <Button
+            key={f}
+            variant={filter === f ? 'default' : 'ghost'}
+            size="sm"
+            className={filter === f ? 'bg-[#7c9cff]/20 text-[#7c9cff] border border-[#7c9cff]/30 btn-hover' : 'text-muted-foreground btn-hover'}
+            onClick={() => store.setTaskFilter(f)}
+          >
+            {f === 'all' ? `All (${store.tasks.length})` : f === 'active' ? `Active (${allPending.length})` : `Completed (${allCompleted.length})`}
+          </Button>
+        ))}
+      </div>
 
       {/* Quick Add */}
       <div className="flex gap-2 mb-6">
@@ -1406,12 +1859,20 @@ function TasksView() {
                   onClick={() => completeTask(task.id)}>
                   <Check className="w-4 h-4" />
                 </Button>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{task.title}</p>
-                  {task.notes && <p className="text-xs text-muted-foreground">{task.notes}</p>}
+                {/* Priority dot */}
+                <span className={`w-2 h-2 rounded-full shrink-0 ${priorityColors[task.priority || 'medium']}`}
+                  title={task.priority || 'medium'} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{task.title}</p>
+                  {task.notes && <p className="text-xs text-muted-foreground truncate">{task.notes}</p>}
                 </div>
-                {task.due && <span className="text-xs text-muted-foreground">{task.due}</span>}
-                <Badge variant="secondary" className="text-[10px]">{task.source}</Badge>
+                {/* Due date with color coding */}
+                {task.due && (
+                  <span className={`text-xs shrink-0 ${isOverdue(task.due) ? 'text-[#ff8a8a] font-medium' : 'text-muted-foreground'}`}>
+                    {isOverdue(task.due) && '⚠️ '}{task.due}
+                  </span>
+                )}
+                <Badge variant="secondary" className="text-[10px] shrink-0">{task.source}</Badge>
               </CardContent>
             </Card>
           ))}
@@ -1422,14 +1883,16 @@ function TasksView() {
       {completed.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Completed ({completed.length})</h3>
-          {completed.slice(0, 10).map(task => (
-            <Card key={task.id} className="bg-[#191c23] border-[#272b34] opacity-60">
-              <CardContent className="p-3 flex items-center gap-3">
-                <Check className="w-4 h-4 text-[#5fd0a0]" />
-                <p className="text-sm line-through text-muted-foreground">{task.title}</p>
-              </CardContent>
-            </Card>
-          ))}
+          <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-2">
+            {completed.map(task => (
+              <Card key={task.id} className="bg-[#191c23] border-[#272b34] opacity-60">
+                <CardContent className="p-3 flex items-center gap-3">
+                  <Check className="w-4 h-4 text-[#5fd0a0] shrink-0" />
+                  <p className="text-sm line-through text-muted-foreground truncate">{task.title}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1446,7 +1909,70 @@ function TasksView() {
 }
 
 /* ========================================================================
-   PROGRESS VIEW (Enhanced)
+   ACHIEVEMENT BADGES
+   ======================================================================== */
+function AchievementBadge({ emoji, title, desc, unlocked }: { emoji: string; title: string; desc: string; unlocked: boolean }) {
+  return (
+    <div className={`relative flex flex-col items-center text-center p-3 rounded-xl border transition-all ${
+      unlocked
+        ? 'bg-gradient-to-b from-[#7c9cff]/10 to-[#9d7cff]/5 border-[#7c9cff]/30 card-hover'
+        : 'bg-[#191c23] border-[#272b34] opacity-50'
+    }`}>
+      <span className={`text-2xl mb-1 ${unlocked ? '' : 'grayscale'}`}>{emoji}</span>
+      <p className="text-xs font-semibold leading-tight">{title}</p>
+      <p className="text-[10px] text-muted-foreground mt-0.5 leading-tight">{desc}</p>
+      {!unlocked && (
+        <Lock className="absolute top-2 right-2 w-3 h-3 text-muted-foreground/40" />
+      )}
+    </div>
+  )
+}
+
+/* ========================================================================
+   WEEKLY ACTIVITY HEATMAP
+   ======================================================================== */
+function WeeklyActivityHeatmap() {
+  const store = useAppStore()
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+  // Calculate activity level based on XP and session count
+  const getActivityLevel = (dayIndex: number) => {
+    // Use session count and XP as proxy for weekly activity
+    const baseActivity = store.sessionCount
+    const xpPerDay = store.xp / 7
+    // Generate deterministic but varied activity per day
+    const dayActivity = (baseActivity * (dayIndex + 1) + store.wins * dayIndex) % 4
+    return Math.min(dayActivity, 3)
+  }
+
+  const colors = [
+    '#191c23',      // 0: no activity
+    'rgba(124,156,255,0.2)',  // 1: some
+    'rgba(124,156,255,0.5)',  // 2: good
+    '#7c9cff',      // 3: great
+  ]
+
+  return (
+    <div className="flex items-center gap-2">
+      {days.map((day, i) => {
+        const level = getActivityLevel(i)
+        return (
+          <div key={day} className="flex flex-col items-center gap-1">
+            <div
+              className="w-8 h-8 rounded-md transition-colors"
+              style={{ backgroundColor: colors[level] }}
+              title={`${day}: ${['No activity', 'Some activity', 'Good activity', 'Great activity'][level]}`}
+            />
+            <span className="text-[9px] text-muted-foreground">{day}</span>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/* ========================================================================
+   PROGRESS VIEW (Enhanced with achievements and heatmap)
    ======================================================================== */
 function AnimatedNumber({ value, label, color, icon: Icon }: { value: number | string; label: string; color: string; icon: React.ElementType }) {
   const [displayed, setDisplayed] = useState(0)
@@ -1505,8 +2031,22 @@ function ProgressView() {
   ]
   const motivation = motivationalMessages.filter(m => streak >= m.min).pop()?.msg || motivationalMessages[0].msg
 
+  // Achievements
+  const achievements = [
+    { emoji: '🌱', title: 'First Steps', desc: 'Complete 1 session', unlocked: totalSessions >= 1 },
+    { emoji: '🔥', title: '3-Day Streak', desc: '3 days in a row', unlocked: streak >= 3 },
+    { emoji: '💪', title: '7-Day Streak', desc: '7 days in a row', unlocked: streak >= 7 },
+    { emoji: '🧠', title: 'Knowledge Seeker', desc: '5 wins', unlocked: wins >= 5 },
+    { emoji: '⭐', title: 'Rising Star', desc: 'Reach Level 3', unlocked: level >= 3 },
+    { emoji: '🏆', title: 'Master Learner', desc: 'Earn 100 XP', unlocked: xp >= 100 },
+    { emoji: '📋', title: 'Task Master', desc: '10 tasks completed', unlocked: completedTasks >= 10 },
+    { emoji: '🗓️', title: 'Week Warrior', desc: 'Complete a 7-day plan', unlocked: Object.values(store.planDayProgress).filter(s => s === 'completed').length >= 7 },
+  ]
+
+  const unlockedCount = achievements.filter(a => a.unlocked).length
+
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-fadeIn">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <h2 className="text-2xl font-bold mb-1">your progress</h2>
       <p className="text-muted-foreground text-sm mb-6">no percentages. just me, noticing you.</p>
 
@@ -1547,6 +2087,22 @@ function ProgressView() {
         </CardContent>
       </Card>
 
+      {/* Weekly Activity Heatmap */}
+      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">Weekly Activity</p>
+          <WeeklyActivityHeatmap />
+          <div className="flex items-center gap-3 mt-3 text-[9px] text-muted-foreground">
+            <span>Less</span>
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#191c23' }} />
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(124,156,255,0.2)' }} />
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: 'rgba(124,156,255,0.5)' }} />
+            <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: '#7c9cff' }} />
+            <span>More</span>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Mastery Bar */}
       <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover">
         <CardContent className="p-4">
@@ -1569,7 +2125,7 @@ function ProgressView() {
       </Card>
 
       {/* Best Streak + Motivation */}
-      <Card className="bg-[#191c23] border-[#272b34] card-hover">
+      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover">
         <CardContent className="p-4">
           <p className="font-medium mb-2"><Flame className="w-4 h-4 inline mr-1 text-[#ffce6b]" />best streak: {bestStreak} 🔥</p>
           <p className="text-xs text-muted-foreground mb-3">
@@ -1580,12 +2136,29 @@ function ProgressView() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Achievements */}
+      <Card className="bg-[#191c23] border-[#272b34] card-hover">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
+              Achievements ({unlockedCount}/{achievements.length})
+            </p>
+            <Trophy className="w-4 h-4 text-[#ffce6b]" />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {achievements.map(a => (
+              <AchievementBadge key={a.title} {...a} />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
 
 /* ========================================================================
-   ROOM VIEW
+   ROOM VIEW (Fixed)
    ======================================================================== */
 function RoomView() {
   const store = useAppStore()
@@ -1594,10 +2167,11 @@ function RoomView() {
 
   const fetchAndSetMessages = useCallback(async () => {
     try {
-      const data = await api('/room', { sessionToken: store.sessionToken })
+      const res = await fetch('/api/room')
+      const data = await res.json()
       setMessages(data.messages || [])
     } catch { /* ignore */ }
-  }, [store.sessionToken])
+  }, [])
 
   const postMessage = async () => {
     const text = input.trim()
@@ -1614,17 +2188,18 @@ function RoomView() {
   useEffect(() => {
     const doFetch = async () => {
       try {
-        const data = await api('/room', { sessionToken: store.sessionToken })
+        const res = await fetch('/api/room')
+        const data = await res.json()
         setMessages(data.messages || [])
       } catch { /* ignore */ }
     }
     doFetch()
     const t = setInterval(doFetch, 5000)
     return () => clearInterval(t)
-  }, [store.sessionToken])
+  }, [])
 
   return (
-    <div className="flex flex-col h-full animate-fadeIn">
+    <div className="flex flex-col h-full animate-tabSwitch">
       <div className="p-4 border-b border-[#272b34]">
         <h2 className="text-lg font-bold">the world room</h2>
         <p className="text-xs text-muted-foreground">everyone learning, in one place</p>
@@ -1667,7 +2242,7 @@ function RoomView() {
 }
 
 /* ========================================================================
-   THINKING SPACE VIEW (New)
+   THINKING SPACE VIEW
    ======================================================================== */
 function ThinkSpaceView() {
   const [selectedAgent, setSelectedAgent] = useState<string | null>(null)
@@ -1703,7 +2278,7 @@ function ThinkSpaceView() {
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-fadeIn">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <div className="flex items-center gap-3 mb-1">
         <h2 className="text-2xl font-bold">think space</h2>
         <span className="text-lg">🔮</span>
@@ -1819,12 +2394,12 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v4')
+    localStorage.removeItem('sitwithme-v5')
     window.location.reload()
   }
 
   return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-fadeIn">
+    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
       <h2 className="text-2xl font-bold mb-1">settings</h2>
 
       <Card className="bg-[#191c23] border-[#272b34] mt-4 card-hover">
@@ -1895,7 +2470,7 @@ function SettingsView() {
 
           <Separator className="bg-[#272b34]" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · version 4.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 5.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -1917,6 +2492,7 @@ function SettingsView() {
 function MainApp() {
   const store = useAppStore()
   const cmdPalette = useCommandPalette()
+  const kbShortcuts = useKeyboardShortcuts()
 
   const navItems: Array<{ id: AppTab; icon: React.ReactNode; label: string }> = [
     { id: 'session', icon: <MessageSquare className="w-[18px]" />, label: 'Session' },
@@ -1945,9 +2521,12 @@ function MainApp() {
   const avatarInitial = displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="h-screen flex bg-[#0e0f13] text-[#eef0f4]">
+    <div className="h-screen flex bg-[#0e0f13] text-[#eef0f4] grid-bg">
       {/* Command Palette */}
       <CommandPalette key={`cp-${cmdPalette.openCount}`} open={cmdPalette.open} onClose={cmdPalette.close} />
+
+      {/* Keyboard Shortcuts */}
+      <KeyboardShortcutsModal open={kbShortcuts.open} onClose={kbShortcuts.close} />
 
       {/* Sidebar - Desktop */}
       <aside className="hidden sm:flex w-60 bg-[#15171d] border-r border-[#272b34] flex-col shrink-0">
@@ -1968,18 +2547,19 @@ function MainApp() {
 
         {/* Nav */}
         <nav className="flex-1 px-2.5 py-1 space-y-0.5 overflow-auto custom-scrollbar">
-          {navItems.map(item => (
+          {navItems.map((item, idx) => (
             <button
               key={item.id}
               onClick={() => store.setTab(item.id)}
-              className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
+              className={`flex items-center gap-3 w-full text-left rounded-lg text-sm transition-all ${
                 store.currentTab === item.id
-                  ? 'bg-[#1f232c] text-foreground'
-                  : 'text-muted-foreground hover:bg-[#191c23] hover:text-foreground'
+                  ? 'sidebar-active text-foreground'
+                  : 'sidebar-inactive text-muted-foreground hover:bg-[#191c23] hover:text-foreground'
               }`}
             >
               {item.icon}
               {item.label}
+              <span className="ml-auto text-[10px] text-muted-foreground/40">{idx + 1}</span>
             </button>
           ))}
         </nav>
@@ -2005,7 +2585,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v4.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v5.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -2025,6 +2605,7 @@ function MainApp() {
               <span className="w-1.5 h-1.5 rounded-full bg-[#5fd0a0]" style={{ animation: 'pulseDot 2s ease-in-out infinite' }} /> Google
             </Badge>
           )}
+          {/* Search / Command Palette Trigger */}
           <button
             onClick={() => cmdPalette.setOpen(true)}
             className="hidden sm:flex items-center gap-2 text-[11px] text-muted-foreground/50 hover:text-muted-foreground transition-colors bg-[#191c23] border border-[#272b34] rounded-md px-2 py-1"
@@ -2033,6 +2614,8 @@ function MainApp() {
             <span>Search</span>
             <kbd className="text-[9px] bg-[#0e0f13] border border-[#272b34] rounded px-1 py-0.5">⌘K</kbd>
           </button>
+          {/* Notification Center */}
+          <NotificationCenter />
         </div>
 
         {/* View Content */}
@@ -2073,18 +2656,19 @@ function MainApp() {
               </Button>
             </div>
             <nav className="flex-1 px-2.5 py-1 space-y-0.5 overflow-auto custom-scrollbar">
-              {navItems.map(item => (
+              {navItems.map((item, idx) => (
                 <button
                   key={item.id}
                   onClick={() => { store.setTab(item.id); store.setSidebarOpen(false) }}
-                  className={`flex items-center gap-3 w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  className={`flex items-center gap-3 w-full text-left rounded-lg text-sm transition-all ${
                     store.currentTab === item.id
-                      ? 'bg-[#1f232c] text-foreground'
-                      : 'text-muted-foreground hover:bg-[#191c23] hover:text-foreground'
+                      ? 'sidebar-active text-foreground'
+                      : 'sidebar-inactive text-muted-foreground hover:bg-[#191c23] hover:text-foreground'
                   }`}
                 >
                   {item.icon}
                   {item.label}
+                  <span className="ml-auto text-[10px] text-muted-foreground/40">{idx + 1}</span>
                 </button>
               ))}
             </nav>
