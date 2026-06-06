@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import { getValidGoogleToken } from '@/lib/google-auth';
 
 export async function POST(request: Request) {
   try {
@@ -15,8 +16,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid session token' }, { status: 401 });
     }
 
-    if (!user.googleToken) {
-      return NextResponse.json({ error: 'Google account not connected' }, { status: 400 });
+    const accessToken = await getValidGoogleToken(user.id);
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'Google token expired. Please reconnect.', needsReauth: true },
+        { status: 401 }
+      );
     }
 
     switch (action) {
@@ -31,7 +36,7 @@ export async function POST(request: Request) {
 
         const response = await fetch(tasksUrl.toString(), {
           headers: {
-            Authorization: `Bearer ${user.googleToken}`,
+            Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
         });
@@ -95,7 +100,7 @@ export async function POST(request: Request) {
           {
             method: 'POST',
             headers: {
-              Authorization: `Bearer ${user.googleToken}`,
+              Authorization: `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify(requestBody),

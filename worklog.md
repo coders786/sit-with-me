@@ -49,3 +49,60 @@ The "Sit With Me" learning companion app is at **v13.0 AGENTIC** and is stable. 
 4. **Clean git history** — Remove large files from git history with git filter-branch
 5. **Auto-generate Flashcards from Chat** — When autoGenerateFlashcards is enabled, auto-create ReviewCards from key concepts
 6. **Collaborative Learning** — Add study groups or pair learning features
+
+---
+Task ID: 2
+Agent: Google OAuth Agent
+Task: Implement Google OAuth and full Google services integration
+
+Work Log:
+- Updated Prisma schema: Added `googleRefreshToken String?` and `googleTokenExpiry DateTime?` fields to User model
+- Ran `bun run db:push` to apply schema changes — SUCCESS
+- Created NextAuth configuration at `/src/app/api/auth/[...nextauth]/route.ts`:
+  - GoogleProvider with extended scopes (calendar, tasks, gmail send+readonly)
+  - prompt: 'consent' and access_type: 'offline' for refresh token
+  - signIn callback: finds or creates user by email, stores tokens + creates profile
+  - session callback: attaches sessionToken and googleConnected to session
+  - Custom signIn page set to '/' (app landing page)
+- Created token refresh helper at `/src/lib/google-auth.ts`:
+  - `getValidGoogleToken(userId)`: checks expiry, refreshes via OAuth2 endpoint if expired
+  - Updates DB with new access token and expiry after refresh
+- Updated Google Calendar API route to use `getValidGoogleToken`:
+  - Returns 401 with `needsReauth: true` if token refresh fails
+- Updated Google Tasks API route to use `getValidGoogleToken`:
+  - Same pattern as calendar route
+- Updated Google Connect route to accept additional OAuth data:
+  - Now accepts `accessToken`, `refreshToken`, `email`, `expiresAt`, `providerId`
+  - Stores all token data properly including refresh token and expiry
+- Updated Gmail API route with new actions:
+  - `send`: existing email sending (now uses token refresh)
+  - `read`: list recent emails with metadata (subject, from, date, snippet)
+  - `get`: fetch full email body by ID with base64 decoding
+- Updated `/api/auth/me` route:
+  - Added GET handler supporting `x-session-token` header
+  - Existing POST handler with sessionToken in body unchanged
+- Updated frontend `page.tsx`:
+  - "Continue with Google" button: now redirects to `/api/auth/signin/google`
+  - "Log In with Google" button: now redirects to `/api/auth/signin/google`
+  - GoogleConnectScreen `connectGoogle()`: redirects to NextAuth Google sign-in
+  - Added `useEffect` in Home component to handle OAuth callback with `googleConnected=true` URL param
+  - Added "Reconnect Google" and "Disconnect" buttons in Settings Google Connections section
+- Updated `.env` with template values:
+  - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (placeholder values)
+  - `NEXTAUTH_SECRET` (auto-generated with `openssl rand -base64 32`)
+  - `NEXTAUTH_URL=http://localhost:3000`
+- Ran `bun run lint` — 0 errors, 0 warnings
+- Verified dev server responding 200 OK on port 3000
+- Verified NextAuth endpoints: `/api/auth/signin` returns 302, `/api/auth/session` returns `{}`
+
+Stage Summary:
+- ✅ Prisma schema updated with googleRefreshToken and googleTokenExpiry
+- ✅ NextAuth Google OAuth fully configured with extended scopes
+- ✅ Token refresh helper created and integrated into all Google API routes
+- ✅ Gmail route enhanced with read/get actions
+- ✅ Frontend Google buttons redirect to real OAuth flow
+- ✅ Settings view has Reconnect/Disconnect Google buttons
+- ✅ OAuth callback handler in Home component
+- ✅ .env configured with NextAuth secrets
+- ✅ Lint passes with 0 errors
+- ⚠️ Google OAuth requires real GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to actually work

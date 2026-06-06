@@ -1916,7 +1916,7 @@ function LandingScreen() {
 
               <Button
                 className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold flex items-center justify-center gap-2 h-11 btn-hover"
-                onClick={() => toast.info('Google OAuth requires server configuration. Use guest account for now.')}
+                onClick={() => { window.location.href = '/api/auth/signin/google' }}
               >
                 <span className="text-lg font-bold text-blue-500">G</span>
                 Continue with Google
@@ -1956,7 +1956,7 @@ function LandingScreen() {
 
               <Button
                 className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold flex items-center justify-center gap-2 h-11 btn-hover"
-                onClick={() => toast.info('Google OAuth requires server configuration. Use resume session.')}
+                onClick={() => { window.location.href = '/api/auth/signin/google' }}
               >
                 <span className="text-lg font-bold text-blue-500">G</span>
                 Log In with Google
@@ -2521,12 +2521,8 @@ function GoogleConnectScreen() {
   const store = useAppStore()
 
   const connectGoogle = () => {
-    toast.info('Google OAuth requires server-side configuration (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET). For now, you can simulate the connection.')
-    store.setGoogle({
-      googleToken: 'demo_token_' + Date.now(),
-      googleEmail: store.userEmail || 'demo@sitwithme.app',
-    })
-    toast.success('Google connected! (Demo mode)')
+    // Redirect to NextAuth Google OAuth
+    window.location.href = '/api/auth/signin/google'
   }
 
   const finish = () => {
@@ -5744,6 +5740,22 @@ function SettingsView() {
                 </div>
               ))}
             </div>
+            <div className="mt-3 flex gap-2">
+              <Button size="sm" variant="outline" className="border-[#272b34] btn-hover text-xs"
+                onClick={() => { window.location.href = '/api/auth/signin/google' }}>
+                <RotateCcw className="w-3 h-3 mr-1" /> Reconnect Google
+              </Button>
+              {store.googleToken && (
+                <Button size="sm" variant="outline" className="border-[#ff8a8a]/30 text-[#ff8a8a] btn-hover text-xs"
+                  onClick={() => {
+                    store.setGoogleConnections({ calendar: false, tasks: false, gmail: false })
+                    store.setGoogle({ googleToken: '', googleEmail: '' })
+                    toast.success('Google disconnected')
+                  }}>
+                  <X className="w-3 h-3 mr-1" /> Disconnect
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="gradient-divider" />
@@ -6373,6 +6385,48 @@ export default function Home() {
   const { currentView } = useAppStore()
   const cmdPalette = useCommandPalette()
   const store = useAppStore()
+
+  // Handle returning from Google OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search)
+    if (urlParams.get('googleConnected') === 'true') {
+      // Fetch the NextAuth session to get our sessionToken
+      fetch('/api/auth/session')
+        .then((r) => r.json())
+        .then((session) => {
+          if (session?.sessionToken) {
+            // Find user by session token and load their data
+            fetch('/api/auth/me', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ sessionToken: session.sessionToken }),
+            })
+              .then((r) => r.json())
+              .then((data) => {
+                if (data.user) {
+                  store.setAuth({
+                    sessionToken: session.sessionToken,
+                    userId: data.user.id,
+                    userName: data.user.name || '',
+                    userEmail: data.user.email,
+                    userPicture: data.user.picture || undefined,
+                    provider: 'google',
+                  })
+                  store.setGoogle({
+                    googleToken: 'oauth_connected',
+                    googleEmail:
+                      data.user.googleEmail || data.user.email,
+                  })
+                  store.setView('app')
+                  toast.success('Google connected successfully!')
+                }
+              })
+          }
+        })
+      // Clean URL
+      window.history.replaceState({}, '', '/')
+    }
+  }, [store])
 
   // Sync theme to document root
   useEffect(() => {

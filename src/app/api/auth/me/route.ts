@@ -24,3 +24,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
   }
 }
+
+export async function GET(request: Request) {
+  try {
+    // Support header-based session lookup for NextAuth callback flow
+    const sessionToken = request.headers.get('x-session-token');
+
+    if (!sessionToken) {
+      return NextResponse.json({ error: 'Session token is required' }, { status: 400 });
+    }
+
+    const user = await db.user.findFirst({ where: { sessionToken } });
+
+    if (!user) {
+      return NextResponse.json({ error: 'Invalid session token' }, { status: 401 });
+    }
+
+    const profile = await db.profile.findUnique({ where: { userId: user.id } });
+
+    return NextResponse.json({ user, profile });
+  } catch (error) {
+    console.error('[me] Error:', error);
+    return NextResponse.json({ error: 'Failed to fetch user' }, { status: 500 });
+  }
+}

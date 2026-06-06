@@ -18,9 +18,11 @@ model User {
   provider      String    @default("guest") // guest, google
   providerId    String?   // Google sub ID
   geminiKey     String?   // Encrypted or stored securely
-  googleToken   String?   // Google OAuth access token
-  googleEmail   String?
-  sessionToken  String?   @unique // For session management
+  googleToken        String?   // Google OAuth access token
+  googleRefreshToken String?   // For refreshing expired access tokens
+  googleTokenExpiry  DateTime? // When the access token expires
+  googleEmail        String?
+  sessionToken       String?   @unique // For session management
   
   // Learning profile
   topic         String?
