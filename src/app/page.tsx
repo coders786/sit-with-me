@@ -21,7 +21,7 @@ import {
   Search, RotateCcw, Wand2, LayoutList, BarChart3, MonitorSmartphone,
   Lightbulb, Code2, Palette, Hash, Bell, Copy, CheckCheck, Filter,
   Clipboard, Download, Lock, Unlock, BookOpen, Sun, Moon, BookMarked,
-  ExternalLink, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, ArrowDown, Quote, Headphones,
+  ExternalLink, ChevronUp, ChevronDown, ChevronLeft, Loader2, ArrowDown, Quote, Headphones,
   Map, Share2, Award, AlertTriangle, Info, MoreHorizontal
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -5892,7 +5892,7 @@ function MainApp() {
     { id: 'tasks', icon: <CheckSquare className="w-[18px]" />, label: 'Tasks' },
     { id: 'progress', icon: <TrendingUp className="w-[18px]" />, label: 'Progress' },
     { id: 'resources', icon: <BookOpen className="w-[18px]" />, label: 'Resources' },
-    { id: 'review', icon: <Clipboard className="w-[18px]" />, label: <span className="flex items-center gap-1">Review{useAppStore.getState().reviewCards.length > 0 && <span className="text-[9px] bg-[#7c9cff]/20 text-[#7c9cff] px-1 rounded">{useAppStore.getState().reviewCards.length}</span>}</span> },
+    { id: 'review', icon: <Clipboard className="w-[18px]" />, label: 'Review' },
     { id: 'thinkspace', icon: <Sparkles className="w-[18px]" />, label: 'Think' },
     { id: 'room', icon: <Globe className="w-[18px]" />, label: 'Room' },
     { id: 'settings', icon: <Settings className="w-[18px]" />, label: 'Settings' },
@@ -6330,6 +6330,42 @@ function MainApp() {
   )
 }
 
+// Rank badge helper - module level so all components can use it
+const getRank = (xp: number) => {
+  if (xp >= 1000) return { title: 'Master', color: '#ffce6b', icon: '👑' }
+  if (xp >= 500) return { title: 'Expert', color: '#c084fc', icon: '🎓' }
+  if (xp >= 200) return { title: 'Scholar', color: '#7c9cff', icon: '📚' }
+  if (xp >= 50) return { title: 'Apprentice', color: '#5fd0a0', icon: '⚡' }
+  return { title: 'Novice', color: '#9ca3af', icon: '🌱' }
+}
+
+/* ========================================================================
+   ERROR BOUNDARY - catch runtime errors in MainApp
+   ======================================================================== */
+class AppErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-[#0e0f13] text-[#eef0f4] p-6">
+          <div className="max-w-md text-center">
+            <h2 className="text-xl font-bold mb-4">Something went wrong</h2>
+            <pre className="text-xs text-left bg-[#191c23] p-3 rounded-lg overflow-auto max-h-40 mb-4 text-[#ff8a8a]">{this.state.error?.message}</pre>
+            <button onClick={() => { localStorage.clear(); location.reload() }} className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold px-6 py-2 rounded-lg">Clear Data & Reload</button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 /* ========================================================================
    ROOT PAGE - View Router
    ======================================================================== */
@@ -6377,15 +6413,6 @@ export default function Home() {
   }
 
   const viewKey = currentView
-
-  // Rank badge helper
-  const getRank = (xp: number) => {
-    if (xp >= 1000) return { title: 'Master', color: '#ffce6b', icon: '👑' }
-    if (xp >= 500) return { title: 'Expert', color: '#c084fc', icon: '🎓' }
-    if (xp >= 200) return { title: 'Scholar', color: '#7c9cff', icon: '📚' }
-    if (xp >= 50) return { title: 'Apprentice', color: '#5fd0a0', icon: '⚡' }
-    return { title: 'Novice', color: '#9ca3af', icon: '🌱' }
-  }
 
   return (
     <TooltipPrimitive.Provider delayDuration={300}>
@@ -6479,7 +6506,7 @@ export default function Home() {
             {currentView === 'onboarding' && <OnboardingScreen />}
             {currentView === 'profile' && <ProfileSetupScreen />}
             {currentView === 'googleconnect' && <GoogleConnectScreen />}
-            {currentView === 'app' && <MainApp />}
+            {currentView === 'app' && <AppErrorBoundary><MainApp /></AppErrorBoundary>}
           </motion.div>
         </AnimatePresence>
         {/* Focus Mode - rendered at root level so it overlays everything */}
