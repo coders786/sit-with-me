@@ -1,0 +1,132 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  picture       String?
+  provider      String    @default("guest") // guest, google
+  providerId    String?   // Google sub ID
+  geminiKey     String?   // Encrypted or stored securely
+  googleToken   String?   // Google OAuth access token
+  googleEmail   String?
+  sessionToken  String?   @unique // For session management
+  
+  // Learning profile
+  topic         String?
+  vision        String?
+  domain        String?
+  level         String?
+  minutesPerDay String?   @default("20")
+  learningStyle String?
+  whyNow        String?
+  obstacle      String?
+  
+  // Progress tracking
+  sessionCount  Int       @default(0)
+  wins          Int       @default(0)
+  successStreak Int       @default(0)
+  bestStreak    Int       @default(0)
+  mastery       Float     @default(0.35)
+  xp            Int       @default(0)
+  
+  // Settings
+  autoTasks     Boolean   @default(true)
+  autoSchedule  Boolean   @default(true)
+  voiceEnabled  Boolean   @default(false)
+  
+  // Google connections
+  calendarConnected Boolean @default(false)
+  tasksConnected    Boolean @default(false)
+  gmailConnected    Boolean @default(false)
+  
+  // Timestamps
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  lastSeenAt    DateTime  @default(now())
+
+  // Relations
+  chatMessages  ChatMessage[]
+  tasks         Task[]
+  plans         Plan[]
+  roomMessages  RoomMessage[]
+  profile       Profile?
+}
+
+model Profile {
+  id            String    @id @default(cuid())
+  userId        String    @unique
+  displayName   String?
+  bio           String?
+  avatar        String?   @default("🧠")
+  goal          String?
+  isPublic      Boolean   @default(true)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ChatMessage {
+  id            String    @id @default(cuid())
+  userId        String
+  role          String    // user, assistant, system
+  content       String
+  isOnboarding  Boolean   @default(false)
+  
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Task {
+  id            String    @id @default(cuid())
+  userId        String
+  title         String
+  notes         String?
+  due           String?
+  status        String    @default("pending") // pending, completed
+  source        String    @default("local") // local, google, ai-extracted
+  googleTaskId  String?
+  
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id            String    @id @default(cuid())
+  userId        String
+  summary       String?
+  adapts        String?
+  weekData      String    // JSON string of the week plan
+  
+  createdAt     DateTime  @default(now())
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RoomMessage {
+  id            String    @id @default(cuid())
+  userId        String?
+  name          String
+  avatar        String    @default("🙂")
+  text          String
+  
+  createdAt     DateTime  @default(now())
+
+  user          User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
