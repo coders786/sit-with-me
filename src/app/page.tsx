@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback, useMemo, Fragment } from 'react'
-import { useAppStore, type AppView, type AppTab, type ChatMsg, type ReviewCard } from '@/lib/store'
+import { useAppStore, type AppView, type AppTab, type ChatMsg, type ReviewCard, type LearningPathPhase } from '@/lib/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -21,7 +21,8 @@ import {
   Search, RotateCcw, Wand2, LayoutList, BarChart3, MonitorSmartphone,
   Lightbulb, Code2, Palette, Hash, Bell, Copy, CheckCheck, Filter,
   Clipboard, Download, Lock, Unlock, BookOpen, Sun, Moon, BookMarked,
-  ExternalLink, ChevronUp, ChevronDown, Loader2, ArrowDown, Quote, Headphones
+  ExternalLink, ChevronUp, ChevronDown, Loader2, ArrowDown, Quote, Headphones,
+  Map, Share2, Award, AlertTriangle, Info, MoreHorizontal
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -306,6 +307,17 @@ function GlobalStyles() {
       @keyframes circularStroke { from { stroke-dashoffset: 283; } to { stroke-dashoffset: 0; } }
       @keyframes staggerFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes gentleBob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+      @keyframes confettiPop { 0% { transform: scale(0) rotate(0deg); opacity: 1; } 50% { transform: scale(1.2) rotate(180deg); opacity: 1; } 100% { transform: scale(0) rotate(360deg); opacity: 0; } }
+      @keyframes slideInFromBottom { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes pathNodePulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(124,156,255,0.4); } 50% { box-shadow: 0 0 0 8px rgba(124,156,255,0); } }
+      @keyframes checkPop { 0% { transform: scale(0); } 60% { transform: scale(1.3); } 100% { transform: scale(1); } }
+      @keyframes shimmerSkeleton { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+
+      /* Smooth scroll behavior */
+      html { scroll-behavior: smooth; }
+
+      /* Focus-visible accessibility */
+      :focus-visible { outline: 2px solid #7c9cff; outline-offset: 2px; border-radius: 4px; }
 
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
@@ -622,6 +634,22 @@ function GlobalStyles() {
       .glass-hover:hover { background: rgba(25, 28, 35, 0.8); border-color: rgba(124,156,255,0.2) !important; }
       .vignette { box-shadow: inset 0 0 150px rgba(0,0,0,0.5); }
 
+      /* Skeleton loading */
+      .skeleton { background: linear-gradient(90deg, #1f232c 25%, #272b34 50%, #1f232c 75%); background-size: 200% 100%; animation: shimmerSkeleton 1.5s ease-in-out infinite; border-radius: 8px; }
+
+      /* Glass bottom nav */
+      .glass-bottom-nav { background: rgba(14,15,19,0.85); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); border-top: 1px solid rgba(255,255,255,0.06); }
+      .glass-bottom-nav .nav-item-active { color: #7c9cff; position: relative; }
+      .glass-bottom-nav .nav-item-active::after { content: ''; position: absolute; top: -1px; left: 50%; transform: translateX(-50%); width: 20px; height: 2px; background: linear-gradient(to right, #7c9cff, #9d7cff); border-radius: 2px; }
+
+      /* Search result highlight border */
+      .search-highlight-border { border: 1px solid rgba(124,156,255,0.4); box-shadow: 0 0 12px rgba(124,156,255,0.1); }
+
+      /* Animated how-it-works step icon */
+      .step-icon-bob { animation: gentleBob 3s ease-in-out infinite; }
+      .step-icon-bob:nth-child(2) { animation-delay: 0.3s; }
+      .step-icon-bob:nth-child(3) { animation-delay: 0.6s; }
+
       /* Light Theme Overrides */
       [data-theme="light"] {
         --theme-bg: #f8f9fb;
@@ -809,7 +837,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'export-data', label: 'Export Data', icon: <Download className="w-4 h-4" />, desc: 'Download all data as JSON', action: () => {
       const state = useAppStore.getState()
       const data = {
-        exportDate: new Date().toISOString(), version: '11.0',
+        exportDate: new Date().toISOString(), version: '12.0',
         profile: state.profile, topic: state.topic, vision: state.vision,
         tasks: state.tasks, reviewCards: state.reviewCards, moodLogs: state.moodLogs,
         chatMessages: state.chatMessages, quickNotes: state.quickNotes,
@@ -826,11 +854,12 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
       state.setPomodoroState({ running: true, timeLeft: dur * 60, mode: 'work' })
       toast.success(`Pomodoro started! ${dur} min focus.`); onClose()
     }},
+    { id: 'learning-path', label: 'Learning Path', icon: <Map className="w-4 h-4" />, desc: 'View your 4-phase path', action: () => { store.setTab('session'); toast.info('Click "My Learning Path" in the dashboard'); onClose() } },
     { id: 'room', label: 'World Room', icon: <Globe className="w-4 h-4" />, desc: 'Community chat', action: () => { store.setTab('room'); onClose() } },
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v11'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v12'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -1627,7 +1656,7 @@ function LandingScreen() {
           <Orb />
         </div>
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v11.0 AGENTIC
+          v12.0 AGENTIC
         </Badge>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 gradient-text">
           sit with me
@@ -1651,7 +1680,7 @@ function LandingScreen() {
         ))}
       </div>
 
-      {/* How It Works Section */}
+      {/* How It Works Section - Enhanced with animated icons */}
       <div className="max-w-3xl mx-auto mb-8 relative z-10" style={{ animation: 'fadeInUp 0.6s ease-out both', animationDelay: '600ms' }}>
         <p className="text-center text-xs text-muted-foreground uppercase tracking-widest mb-6">How It Works</p>
         <div className="flex items-start justify-center gap-8 sm:gap-12">
@@ -1661,8 +1690,8 @@ function LandingScreen() {
             { step: 3, emoji: '🚀', title: 'Start Learning', desc: 'Get a personalized plan and go' },
           ].map((s, i) => (
             <div key={s.step} className="flex flex-col items-center text-center max-w-[140px] step-line">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg mb-2"
-                style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }}>
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg mb-2 step-icon-bob"
+                style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', animationDelay: `${i * 0.3}s` }}>
                 {s.emoji}
               </div>
               <div className="text-xs font-bold text-foreground mb-1">{s.title}</div>
@@ -2024,6 +2053,14 @@ function OnboardingScreen() {
   // Allow skipping to profile once we have minimum fields (topic + level)
   const canSkip = !!(store.topic && store.level)
 
+  // Confetti effect when onboarding reaches 8/8
+  useEffect(() => {
+    if (filledCount === 8 && !store.confettiActive) {
+      store.triggerConfetti()
+      store.addNotification('🎉 All 8 profile fields discovered! Amazing!')
+    }
+  }, [filledCount, store])
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 animate-fadeIn"
       style={{ background: 'radial-gradient(1200px 700px at 50% -10%, #1a1d27 0%, #0e0f13 60%)' }}>
@@ -2038,21 +2075,31 @@ function OnboardingScreen() {
             <div className="h-full rounded-full transition-all duration-500 progress-shimmer"
               style={{ width: `${progressPct}%`, background: 'linear-gradient(to right, #7c9cff, #9d7cff)' }} />
           </div>
-          {/* Field indicator pills */}
+          {/* Field indicator pills with animated checkmarks */}
           <div className="flex flex-wrap gap-1.5 mt-2">
-            {profileFieldLabels.map(f => {
+            {profileFieldLabels.map((f, idx) => {
               const isFilled = !!profileFieldsMap[f.key]
               return (
                 <span key={f.key} className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-medium transition-all duration-300 ${
                   isFilled
                     ? 'bg-[#7c9cff]/20 text-[#7c9cff] border border-[#7c9cff]/30'
                     : 'bg-[#1f232c] text-muted-foreground border border-[#272b34]'
-                }`}>
-                  {f.icon} {f.label}
+                }`} style={isFilled ? { animation: `checkPop 0.3s ease-out ${idx * 50}ms both` } : {}}>
+                  {isFilled ? <Check className="w-2.5 h-2.5 mr-0.5" style={{ animation: 'checkPop 0.4s ease-out' }} /> : f.icon} {f.label}
                 </span>
               )
             })}
           </div>
+          {/* Reflection card when 8/8 discovered */}
+          {filledCount === 8 && (
+            <div className="mt-3 p-3 rounded-xl border border-[#5fd0a0]/30 bg-[#5fd0a0]/5 animate-slideUp">
+              <div className="flex items-center gap-2 mb-1.5">
+                <Award className="w-4 h-4 text-[#5fd0a0]" />
+                <span className="text-xs font-semibold text-[#5fd0a0]">Profile Complete!</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground">All 8 learning dimensions discovered. Your personalized experience is ready.</p>
+            </div>
+          )}
         </div>
         <Orb speaking={busy} />
         <h2 className="text-2xl font-bold text-center mb-4">let&apos;s discover your learning path</h2>
@@ -2166,71 +2213,159 @@ function ProfileSetupScreen() {
     }
   }
 
+  // Motivational tagline based on profile data
+  const tagline = useMemo(() => {
+    const level = store.level?.toLowerCase() || 'beginner'
+    const topic = store.topic || 'learning'
+    const mins = store.minutesPerDay || '20'
+    if (level.includes('advanced')) return `Mastering ${topic} with ${mins} mins of daily focus`
+    if (level.includes('intermediate')) return `Leveling up in ${topic} — ${mins} mins at a time`
+    return `From ${level} to ${topic} expert in ${mins} mins/day`
+  }, [store.level, store.topic, store.minutesPerDay])
+
+  // Level color coding
+  const levelColor = useMemo(() => {
+    const lvl = store.level?.toLowerCase() || 'beginner'
+    if (lvl.includes('advanced')) return 'bg-[#ff8a8a]/20 text-[#ff8a8a] border-[#ff8a8a]/30'
+    if (lvl.includes('intermediate')) return 'bg-[#ffce6b]/20 text-[#ffce6b] border-[#ffce6b]/30'
+    return 'bg-[#5fd0a0]/20 text-[#5fd0a0] border-[#5fd0a0]/30'
+  }, [store.level])
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 animate-fadeIn"
       style={{ background: 'radial-gradient(1200px 700px at 50% -10%, #1a1d27 0%, #0e0f13 60%)' }}>
-      <div className="w-full max-w-lg">
+      <div className="w-full max-w-4xl">
         <Orb />
         <h2 className="text-2xl font-bold text-center mb-2">almost done</h2>
         <p className="text-muted-foreground text-center mb-6">let&apos;s set up your profile.</p>
 
-        <Card className="bg-[#191c23] border-[#272b34] card-hover">
-          <CardContent className="p-6 space-y-4">
-            <div>
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Display Name</Label>
-              <Input
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="your name"
-                className="mt-1 bg-[#0e0f13] border-[#272b34] focus:border-[#7c9cff]"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">What you&apos;re working toward</Label>
-              <Input
-                value={goal}
-                onChange={(e) => setGoal(e.target.value)}
-                placeholder="build my own app"
-                className="mt-1 bg-[#0e0f13] border-[#272b34] focus:border-[#7c9cff]"
-              />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">How you learn best</Label>
-              <Select value={style} onValueChange={setStyle}>
-                <SelectTrigger className="mt-1 bg-[#0e0f13] border-[#272b34]">
-                  <SelectValue placeholder="select..." />
-                </SelectTrigger>
-                <SelectContent className="bg-[#191c23] border-[#272b34]">
-                  <SelectItem value="show me then i copy">Show me, then I copy</SelectItem>
-                  <SelectItem value="let me try, catch my mistakes">Let me try, catch my mistakes</SelectItem>
-                  <SelectItem value="explain the why first">Explain the why first</SelectItem>
-                  <SelectItem value="interactive socratic dialogue">Interactive Socratic dialogue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Motivational Tagline */}
+        {store.topic && (
+          <div className="text-center mb-4 animate-slideUp">
+            <p className="text-sm font-medium gradient-text italic">&quot;{tagline}&quot;</p>
+          </div>
+        )}
 
-            {/* Cognitive State Card */}
-            {store.topic && (
-              <div className="bg-[#0e0f13] p-4 rounded-xl border border-dashed border-[#272b34]">
-                <div className="flex items-center gap-2 mb-3">
-                  <Brain className="w-4 h-4 text-[#7c9cff]" />
-                  <span className="text-xs text-[#7c9cff] uppercase tracking-wider font-semibold">Cognitive State Matrix</span>
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Form */}
+          <Card className="flex-1 bg-[#191c23] border-[#272b34] card-hover">
+            <CardContent className="p-6 space-y-4">
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Display Name</Label>
+                <Input
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="your name"
+                  className="mt-1 bg-[#0e0f13] border-[#272b34] focus:border-[#7c9cff]"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">What you&apos;re working toward</Label>
+                <Input
+                  value={goal}
+                  onChange={(e) => setGoal(e.target.value)}
+                  placeholder="build my own app"
+                  className="mt-1 bg-[#0e0f13] border-[#272b34] focus:border-[#7c9cff]"
+                />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground uppercase tracking-wider">How you learn best</Label>
+                <Select value={style} onValueChange={setStyle}>
+                  <SelectTrigger className="mt-1 bg-[#0e0f13] border-[#272b34]">
+                    <SelectValue placeholder="select..." />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#191c23] border-[#272b34]">
+                    <SelectItem value="show me then i copy">Show me, then I copy</SelectItem>
+                    <SelectItem value="let me try, catch my mistakes">Let me try, catch my mistakes</SelectItem>
+                    <SelectItem value="explain the why first">Explain the why first</SelectItem>
+                    <SelectItem value="interactive socratic dialogue">Interactive Socratic dialogue</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Cognitive State Card - Enhanced with colored badges */}
+              {store.topic && (
+                <div className="bg-[#0e0f13] p-4 rounded-xl border border-dashed border-[#272b34]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Brain className="w-4 h-4 text-[#7c9cff]" />
+                    <span className="text-xs text-[#7c9cff] uppercase tracking-wider font-semibold">Cognitive State Matrix</span>
+                  </div>
+                  <div className="space-y-2">
+                    {/* Depth badge */}
+                    <div className="flex items-center gap-2">
+                      <Badge className={`text-[10px] border px-2 py-0.5 ${levelColor}`}>{store.level || 'Beginner'}</Badge>
+                      <span className="text-[10px] text-muted-foreground">Depth Level</span>
+                    </div>
+                    {/* Daily slot */}
+                    <div className="flex items-center gap-2">
+                      <Badge className="text-[10px] border border-[#7c9cff]/30 bg-[#7c9cff]/15 text-[#7c9cff] px-2 py-0.5">
+                        <Clock className="w-2.5 h-2.5 mr-1" />{store.minutesPerDay || '20'} min/day
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">Daily Slot</span>
+                    </div>
+                    {/* Focus */}
+                    <div className="flex items-center gap-2">
+                      <Badge className="text-[10px] border border-[#9d7cff]/30 bg-[#9d7cff]/15 text-[#9d7cff] px-2 py-0.5">
+                        <Target className="w-2.5 h-2.5 mr-1" />{store.topic}
+                      </Badge>
+                      <span className="text-[10px] text-muted-foreground">Focus</span>
+                    </div>
+                    {/* Goal */}
+                    {(store.vision || goal) && (
+                      <div className="flex items-center gap-2">
+                        <Badge className="text-[10px] border border-[#ffce6b]/30 bg-[#ffce6b]/15 text-[#ffce6b] px-2 py-0.5">
+                          <Star className="w-2.5 h-2.5 mr-1" />{store.vision || goal}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">Goal</span>
+                      </div>
+                    )}
+                    {/* Block */}
+                    {store.obstacle && (
+                      <div className="flex items-center gap-2">
+                        <Badge className="text-[10px] border border-[#ff8a8a]/30 bg-[#ff8a8a]/15 text-[#ff8a8a] px-2 py-0.5">
+                          <AlertTriangle className="w-2.5 h-2.5 mr-1" />{store.obstacle}
+                        </Badge>
+                        <span className="text-[10px] text-muted-foreground">Block</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div><span className="text-muted-foreground">Depth:</span> <span className="font-medium">{store.level || 'Beginner'}</span></div>
-                  <div><span className="text-muted-foreground">Daily Slot:</span> <span className="font-medium text-[#7c9cff]">{store.minutesPerDay || '20'} min</span></div>
-                  <div><span className="text-muted-foreground">Focus:</span> <span className="font-medium">{store.topic}</span></div>
-                  <div><span className="text-muted-foreground">Goal:</span> <span className="font-medium">{store.vision || '—'}</span></div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Live Preview Card (Desktop) */}
+          <div className="hidden lg:block w-72">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-2 text-center">Profile Preview</p>
+            <div className="rounded-xl p-5 relative overflow-hidden border border-[#272b34]"
+              style={{ background: 'linear-gradient(135deg, #1a1d2e, #1e2235, #1a1d2e)' }}>
+              <div className="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10"
+                style={{ background: 'radial-gradient(circle, #7c9cff, transparent)', transform: 'translate(30%, -30%)' }} />
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold text-[#0e0f13]"
+                    style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
+                    {(displayName || 'L').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="font-semibold text-sm text-foreground">{displayName || 'Your Name'}</p>
+                    <p className="text-[10px] text-muted-foreground">{goal || 'Your goal'}</p>
+                  </div>
                 </div>
-                {store.obstacle && (
-                  <p className="text-xs text-[#ff8a8a] mt-2 pt-2 border-t border-[#272b34]">
-                    ⚠️ Block: {store.obstacle}
-                  </p>
+                {store.topic && (
+                  <div className="space-y-1.5 text-[10px]">
+                    <div className="flex items-center gap-1.5">
+                      <Badge className={`text-[8px] border px-1.5 py-0 ${levelColor}`}>{store.level || 'Beginner'}</Badge>
+                      <span className="text-muted-foreground">· {store.minutesPerDay || '20'}m/day</span>
+                    </div>
+                    <p className="text-[#9d7cff]">🎯 {store.topic}</p>
+                    {style && <p className="text-muted-foreground">🎨 {style}</p>}
+                  </div>
                 )}
               </div>
-            )}
-          </CardContent>
-        </Card>
+            </div>
+          </div>
+        </div>
 
         <div className="flex gap-3 mt-6 justify-center">
           <Button variant="ghost" onClick={() => store.setView('onboarding')} className="text-muted-foreground btn-hover">
@@ -2321,6 +2456,305 @@ function GoogleConnectScreen() {
 }
 
 /* ========================================================================
+   LEARNING PATH MODAL
+   ======================================================================== */
+function LearningPathModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const store = useAppStore()
+  const [loading, setLoading] = useState(false)
+  const [pathData, setPathData] = useState<LearningPathPhase[]>(store.learningPath)
+
+  const fetchPath = useCallback(async () => {
+    if (store.learningPath.length > 0) {
+      setPathData(store.learningPath)
+      return
+    }
+    setLoading(true)
+    try {
+      const data = await api('/ai/path', { sessionToken: store.sessionToken })
+      if (data.phases) {
+        store.setLearningPath(data.phases)
+        setPathData(data.phases)
+      }
+    } catch (err: unknown) {
+      toast.error((err as Error).message || 'Failed to generate learning path')
+    } finally {
+      setLoading(false)
+    }
+  }, [store])
+
+  useEffect(() => {
+    if (open) fetchPath()
+  }, [open, fetchPath])
+
+  // Determine current phase based on milestones completed
+  const currentPhase = useMemo(() => {
+    for (let i = 0; i < pathData.length; i++) {
+      const completedMilestones = pathData[i].milestones.filter(m => m.completed).length
+      if (completedMilestones < pathData[i].milestones.length) return i
+    }
+    return pathData.length - 1
+  }, [pathData])
+
+  const totalMilestones = pathData.reduce((acc, p) => acc + p.milestones.length, 0)
+  const completedMilestones = pathData.reduce((acc, p) => acc + p.milestones.filter(m => m.completed).length, 0)
+  const overallPct = totalMilestones > 0 ? Math.round((completedMilestones / totalMilestones) * 100) : 0
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-2xl max-h-[85vh] bg-[#191c23] border border-[#272b34] rounded-2xl shadow-2xl overflow-hidden animate-fadeInUp"
+        onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-4 border-b border-[#272b34] flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, rgba(124,156,255,0.08), rgba(157,124,255,0.08))' }}>
+          <div className="flex items-center gap-2">
+            <Map className="w-5 h-5 text-[#7c9cff]" />
+            <h3 className="text-lg font-bold gradient-text">My Learning Path</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <Badge className="bg-[#7c9cff]/15 text-[#7c9cff] border-0 text-xs">{overallPct}% complete</Badge>
+            <Button variant="ghost" size="sm" onClick={onClose} className="btn-hover"><X className="w-4 h-4" /></Button>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="px-4 pt-3">
+          <div className="h-2 bg-[#272b34] rounded-full overflow-hidden progress-shimmer">
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${overallPct}%`, background: 'linear-gradient(to right, #7c9cff, #9d7cff)' }} />
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="p-4 overflow-y-auto custom-scrollbar max-h-[65vh]">
+          {loading ? (
+            <div className="space-y-4 py-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="skeleton h-32 w-full" style={{ animationDelay: `${i * 100}ms` }} />
+              ))}
+            </div>
+          ) : pathData.length === 0 ? (
+            <div className="text-center py-12">
+              <Map className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+              <p className="text-muted-foreground text-sm">No learning path yet.</p>
+              <Button onClick={fetchPath} className="mt-3 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] btn-hover text-sm">
+                Generate My Path
+              </Button>
+            </div>
+          ) : (
+            <div className="relative">
+              {/* Timeline connector line */}
+              <div className="absolute left-6 top-0 bottom-0 w-0.5 bg-gradient-to-b from-[#7c9cff]/40 via-[#9d7cff]/40 to-[#c084fc]/40" />
+
+              {pathData.map((phase, pi) => {
+                const isCurrent = pi === currentPhase
+                const isCompleted = phase.milestones.length > 0 && phase.milestones.every(m => m.completed)
+                const phaseProgress = phase.milestones.length > 0 ? Math.round((phase.milestones.filter(m => m.completed).length / phase.milestones.length) * 100) : 0
+
+                return (
+                  <div key={pi} className="relative pl-16 pb-8 last:pb-0" style={{ animation: `slideInFromBottom 0.4s ease-out ${pi * 100}ms both` }}>
+                    {/* Phase node */}
+                    <div className={`absolute left-3 w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 ${
+                      isCurrent ? 'bg-gradient-to-br from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] shadow-lg' :
+                      isCompleted ? 'bg-[#5fd0a0] text-[#0e0f13]' :
+                      'bg-[#272b34] text-muted-foreground'
+                    }`} style={isCurrent ? { animation: 'pathNodePulse 2s ease-in-out infinite' } : {}}>
+                      {isCompleted ? <Check className="w-3.5 h-3.5" /> : phase.phase}
+                    </div>
+
+                    {/* Phase card */}
+                    <Card className={`bg-[#15171d] border-[#272b34] card-hover ${isCurrent ? 'border-l-2 border-l-[#7c9cff]' : ''}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div>
+                            <h4 className="text-sm font-bold text-[#c5d0ff]">{phase.title}</h4>
+                            <p className="text-xs text-muted-foreground mt-0.5">{phase.description}</p>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                            <Badge className="text-[8px] bg-[#0e0f13] text-muted-foreground border border-[#272b34]">
+                              ~{phase.estimatedWeeks}w
+                            </Badge>
+                            <Badge className={`text-[8px] border-0 ${isCompleted ? 'bg-[#5fd0a0]/20 text-[#5fd0a0]' : isCurrent ? 'bg-[#7c9cff]/20 text-[#7c9cff]' : 'bg-[#272b34] text-muted-foreground'}`}>
+                              {phaseProgress}%
+                            </Badge>
+                          </div>
+                        </div>
+
+                        {/* Milestones */}
+                        <div className="space-y-1.5 mt-3">
+                          {phase.milestones.map((milestone, mi) => (
+                            <button
+                              key={mi}
+                              onClick={() => store.toggleMilestone(pi, mi)}
+                              className="flex items-center gap-2 w-full text-left text-xs py-1 px-2 rounded-md hover:bg-[#1f232c] transition-colors group">
+                              <div className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 transition-all ${
+                                milestone.completed
+                                  ? 'bg-[#5fd0a0] border-[#5fd0a0] text-[#0e0f13]'
+                                  : 'border-[#3a3f4b] text-transparent group-hover:border-[#7c9cff]'
+                              }`} style={milestone.completed ? { animation: 'checkPop 0.3s ease-out' } : {}}>
+                                <Check className="w-2.5 h-2.5" />
+                              </div>
+                              <span className={milestone.completed ? 'line-through text-muted-foreground' : 'text-foreground/80'}>{milestone.text}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Resources */}
+                        {phase.resources.length > 0 && (
+                          <div className="mt-3 pt-2 border-t border-[#272b34]">
+                            <p className="text-[9px] text-muted-foreground uppercase tracking-widest mb-1">Resources</p>
+                            {phase.resources.map((res, ri) => (
+                              <a key={ri} href={res.url} target="_blank" rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-xs text-[#7c9cff] hover:text-[#9d7cff] transition-colors py-0.5">
+                                <ExternalLink className="w-3 h-3" />{res.title}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================
+   SHARE ACHIEVEMENT MODAL
+   ======================================================================== */
+function ShareAchievementModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const store = useAppStore()
+  const [copied, setCopied] = useState(false)
+
+  const displayName = store.profile?.displayName || store.userName || 'Learner'
+  const level = Math.floor(store.xp / 100) + 1
+  const completedTasks = store.tasks.filter(t => t.status === 'completed').length
+  const unlockedAchievements = [
+    { emoji: '🌱', title: 'First Steps', unlocked: store.sessionCount >= 1 },
+    { emoji: '🔥', title: '3-Day Streak', unlocked: store.successStreak >= 3 },
+    { emoji: '💪', title: '7-Day Streak', unlocked: store.successStreak >= 7 },
+    { emoji: '🧠', title: 'Knowledge Seeker', unlocked: store.wins >= 5 },
+    { emoji: '⭐', title: 'Rising Star', unlocked: level >= 3 },
+    { emoji: '🏆', title: 'Master Learner', unlocked: store.xp >= 100 },
+    { emoji: '📋', title: 'Task Master', unlocked: completedTasks >= 10 },
+    { emoji: '🗓️', title: 'Week Warrior', unlocked: Object.values(store.planDayProgress).filter(s => s === 'completed').length >= 7 },
+  ]
+  const topAchievement = unlockedAchievements.find(a => a.unlocked)
+
+  const shareText = `🗺️ My Learning Journey on "Sit With Me"
+
+👤 ${displayName} | Level ${level} | ${store.xp} XP
+📚 Learning: ${store.topic || 'General'}
+🎯 Goal: ${store.vision || 'Keep improving'}
+🔥 Streak: ${store.successStreak} days
+✅ Tasks completed: ${completedTasks}
+${topAchievement ? `🏅 Top badge: ${topAchievement.emoji} ${topAchievement.title}` : ''}
+${store.topic ? `⏱️ ${store.minutesPerDay || 20} mins/day` : ''}
+
+Join me at sitwithme.app 🚀`
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(shareText)
+    setCopied(true)
+    toast.success('Progress copied to clipboard!')
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  if (!open) return null
+
+  return (
+    <div className="fixed inset-0 z-[90] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-md bg-[#191c23] border border-[#272b34] rounded-2xl shadow-2xl overflow-hidden animate-fadeInUp"
+        onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-4 border-b border-[#272b34] flex items-center justify-between"
+          style={{ background: 'linear-gradient(135deg, rgba(255,206,107,0.08), rgba(251,146,60,0.08))' }}>
+          <div className="flex items-center gap-2">
+            <Share2 className="w-5 h-5 text-[#ffce6b]" />
+            <h3 className="text-lg font-bold">Share Progress</h3>
+          </div>
+          <Button variant="ghost" size="sm" onClick={onClose} className="btn-hover"><X className="w-4 h-4" /></Button>
+        </div>
+
+        {/* Preview Card */}
+        <div className="p-4">
+          <div className="rounded-xl p-5 relative overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, #1a1d2e, #1e2235, #1a1d2e)' }}>
+            {/* Decorative circles */}
+            <div className="absolute top-0 right-0 w-32 h-32 rounded-full opacity-10"
+              style={{ background: 'radial-gradient(circle, #7c9cff, transparent)', transform: 'translate(30%, -30%)' }} />
+            <div className="absolute bottom-0 left-0 w-24 h-24 rounded-full opacity-10"
+              style={{ background: 'radial-gradient(circle, #9d7cff, transparent)', transform: 'translate(-30%, 30%)' }} />
+
+            <div className="relative z-10">
+              {/* Avatar + Name */}
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold text-[#0e0f13]"
+                  style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="font-bold text-sm text-foreground">{displayName}</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Badge className="bg-[#9d7cff]/20 text-[#9d7cff] border-0 text-[9px] px-1.5">Lv.{level}</Badge>
+                    <span className="text-[10px] text-muted-foreground">{store.xp} XP</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Stats grid */}
+              <div className="grid grid-cols-3 gap-2 mb-3">
+                <div className="bg-[#0e0f13]/60 rounded-lg p-2 text-center">
+                  <div className="text-sm font-bold text-[#7c9cff]">{completedTasks}</div>
+                  <div className="text-[8px] text-muted-foreground">Tasks</div>
+                </div>
+                <div className="bg-[#0e0f13]/60 rounded-lg p-2 text-center">
+                  <div className="text-sm font-bold text-[#ffce6b]">{store.successStreak}🔥</div>
+                  <div className="text-[8px] text-muted-foreground">Streak</div>
+                </div>
+                <div className="bg-[#0e0f13]/60 rounded-lg p-2 text-center">
+                  <div className="text-sm font-bold text-[#5fd0a0]">{store.sessionCount}</div>
+                  <div className="text-[8px] text-muted-foreground">Sessions</div>
+                </div>
+              </div>
+
+              {/* Topic + Goal */}
+              {store.topic && (
+                <div className="text-[10px] text-muted-foreground">
+                  📚 {store.topic} · {store.minutesPerDay || 20}m/day
+                </div>
+              )}
+              {topAchievement && (
+                <div className="text-[10px] text-[#ffce6b] mt-1">
+                  🏅 {topAchievement.emoji} {topAchievement.title}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action */}
+        <div className="px-4 pb-4">
+          <Button onClick={handleCopy} className="w-full bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold btn-hover">
+            {copied ? <><CheckCheck className="w-4 h-4 mr-2" /> Copied!</> : <><Copy className="w-4 h-4 mr-2" /> Copy to Clipboard</>}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ========================================================================
    DASHBOARD WIDGET
    ======================================================================== */
 const MOTIVATIONAL_QUOTES = [
@@ -2336,6 +2770,7 @@ const MOTIVATIONAL_QUOTES = [
 
 function DashboardWidget() {
   const store = useAppStore()
+  const [pathModalOpen, setPathModalOpen] = useState(false)
 
   // Set motivational quote on mount
   useEffect(() => {
@@ -2461,6 +2896,21 @@ function DashboardWidget() {
             ))}
           </div>
         )}
+
+        {/* My Path Button */}
+        <Button
+          onClick={() => setPathModalOpen(true)}
+          className="mt-3 w-full bg-gradient-to-r from-[#7c9cff]/15 to-[#9d7cff]/15 text-[#7c9cff] border border-[#7c9cff]/20 hover:from-[#7c9cff]/25 hover:to-[#9d7cff]/25 btn-hover text-xs h-8"
+          variant="outline">
+          <Map className="w-3.5 h-3.5 mr-1.5" /> My Learning Path
+          {store.learningPath.length > 0 && (
+            <Badge className="ml-2 bg-[#7c9cff]/20 text-[#7c9cff] border-0 text-[8px] px-1">
+              {store.learningPath.reduce((acc, p) => acc + p.milestones.filter(m => m.completed).length, 0)}/{store.learningPath.reduce((acc, p) => acc + p.milestones.length, 0)}
+            </Badge>
+          )}
+        </Button>
+
+        <LearningPathModal open={pathModalOpen} onClose={() => setPathModalOpen(false)} />
       </CardContent>
     </Card>
   )
@@ -2634,6 +3084,7 @@ function ChatSessionView() {
   const chatRef = useRef<HTMLDivElement>(null)
   const [showScrollBottom, setShowScrollBottom] = useState(false)
   const [ttsLoadingId, setTtsLoadingId] = useState<string | null>(null)
+  const [sessionCompleteTriggered, setSessionCompleteTriggered] = useState(false)
 
   // Chat search state
   const [searchOpen, setSearchOpen] = useState(false)
@@ -2650,6 +3101,32 @@ function ChatSessionView() {
   const [studyContent, setStudyContent] = useState('')
   const [studyLoading, setStudyLoading] = useState(false)
   const [showAnswers, setShowAnswers] = useState(false)
+
+  // Session complete detection
+  useEffect(() => {
+    if (sessionCompleteTriggered) return
+    const sessionDuration = store.sessionStartTime ? (Date.now() - store.sessionStartTime) / 60000 : 0
+    const lastUserMsg = [...store.chatMessages].reverse().find(m => m.role === 'user')
+    if (lastUserMsg && sessionDuration > 5) {
+      const lower = lastUserMsg.content.toLowerCase()
+      if (/^(thanks|thank you|done|got it|that helps|perfect|awesome|great|bye|see you)/i.test(lower.trim())) {
+        setSessionCompleteTriggered(true)
+        store.triggerConfetti()
+        store.setProgress({ xp: store.xp + 25 })
+        store.addNotification('🎉 Session complete! +25 XP')
+        toast.success('🎉 Session Complete! +25 XP')
+      }
+    }
+  }, [store.chatMessages, store.sessionStartTime, sessionCompleteTriggered, store])
+
+  // Mini stats calculations
+  const messageCount = store.chatMessages.filter(m => m.role === 'user').length
+  const sessionDurationMins = store.sessionStartTime ? Math.floor((Date.now() - store.sessionStartTime) / 60000) : 0
+  const wordsLearned = useMemo(() => {
+    const aiMsgs = store.chatMessages.filter(m => m.role === 'assistant')
+    const allWords = aiMsgs.join(' ').split(/\s+/).length
+    return Math.round(allWords * 0.03) // rough estimate of "new" words
+  }, [store.chatMessages])
 
   // Scroll detection for scroll-to-bottom button
   useEffect(() => {
@@ -2887,6 +3364,37 @@ function ChatSessionView() {
       {/* Agent Trace Panel */}
       <AgentTracePanel visible={store.chatBusy} />
 
+      {/* Session Goal Banner */}
+      <div className="px-4 pt-3 max-w-3xl mx-auto w-full">
+        {store.sessionGoal ? (
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-gradient-to-r from-[#7c9cff]/8 to-[#9d7cff]/8 border border-[#7c9cff]/15 animate-slideUp">
+            <Target className="w-3.5 h-3.5 text-[#7c9cff] shrink-0" />
+            <span className="text-xs text-foreground/80 flex-1 truncate">🎯 {store.sessionGoal}</span>
+            <button onClick={() => store.setSessionGoal(null)} className="text-muted-foreground hover:text-foreground shrink-0">
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <input
+              placeholder="Set a goal for this session..."
+              className="flex-1 bg-[#191c23]/60 border border-[#272b34] rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 focus:border-[#7c9cff]/50 outline-none transition-colors"
+              onKeyDown={e => {
+                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
+                  store.setSessionGoal(e.currentTarget.value.trim())
+                  toast.success('Session goal set!')
+                }
+              }}
+              onBlur={e => {
+                if (e.target.value.trim()) {
+                  store.setSessionGoal(e.target.value.trim())
+                }
+              }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Chat Search Bar */}
       {searchOpen && (
         <div className="px-4 py-2 border-b border-[#272b34] max-w-3xl mx-auto w-full animate-slideUp">
@@ -3123,6 +3631,12 @@ function ChatSessionView() {
                 {chip}
               </button>
             ))}
+          </div>
+          {/* Mini Stats Bar */}
+          <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground/50">
+            <span className="flex items-center gap-1"><MessageSquare className="w-2.5 h-2.5" />{messageCount}</span>
+            <span className="flex items-center gap-1"><Clock className="w-2.5 h-2.5" />{sessionDurationMins}m</span>
+            <span className="flex items-center gap-1"><BookOpen className="w-2.5 h-2.5" />~{wordsLearned} words</span>
           </div>
         </div>
       </div>
@@ -3654,6 +4168,7 @@ function AnimatedNumber({ value, label, color, icon: Icon }: { value: number | s
 
 function ProgressView() {
   const store = useAppStore()
+  const [shareModalOpen, setShareModalOpen] = useState(false)
   const totalSessions = store.sessionCount
   const wins = store.wins
   const streak = store.successStreak
@@ -3978,7 +4493,13 @@ function ProgressView() {
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">
               Achievements ({unlockedCount}/{achievements.length})
             </p>
-            <Trophy className="w-4 h-4 text-[#ffce6b]" />
+            <div className="flex items-center gap-2">
+              <Button onClick={() => setShareModalOpen(true)} variant="outline" size="sm"
+                className="h-6 text-[10px] border-[#ffce6b]/30 text-[#ffce6b] btn-hover">
+                <Share2 className="w-3 h-3 mr-1" /> Share
+              </Button>
+              <Trophy className="w-4 h-4 text-[#ffce6b]" />
+            </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {achievements.map(a => (
@@ -3987,6 +4508,8 @@ function ProgressView() {
           </div>
         </CardContent>
       </Card>
+
+      <ShareAchievementModal open={shareModalOpen} onClose={() => setShareModalOpen(false)} />
     </div>
   )
 }
@@ -4714,14 +5237,14 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v11')
+    localStorage.removeItem('sitwithme-v12')
     window.location.reload()
   }
 
   const handleExportData = () => {
     const data = {
       exportDate: new Date().toISOString(),
-      version: '11.0',
+      version: '12.0',
       profile: store.profile,
       topic: store.topic,
       vision: store.vision,
@@ -4993,7 +5516,7 @@ function SettingsView() {
 
           <div className="gradient-divider" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 11.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 12.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -5256,7 +5779,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v11.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v12.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -5358,26 +5881,26 @@ function MainApp() {
           </AnimatePresence>
         </div>
 
-        {/* Mobile Bottom Nav with Drawer */}
-        <nav className="sm:hidden flex border-t border-[#272b34] bg-[#15171d]">
+        {/* Mobile Bottom Nav with Drawer - Enhanced */}
+        <nav className="sm:hidden flex glass-bottom-nav safe-area-bottom">
           {navItems.slice(0, 5).map(item => (
             <button
               key={item.id}
               onClick={() => store.setTab(item.id)}
-              className={`flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] transition-colors ${
-                store.currentTab === item.id ? 'text-[#7c9cff]' : 'text-muted-foreground'
+              className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] transition-all ${
+                store.currentTab === item.id ? 'nav-item-active' : 'text-muted-foreground hover:text-foreground/70'
               }`}
             >
               {item.icon}
-              {item.label}
+              <span className="font-medium">{typeof item.label === 'string' ? item.label : ''}</span>
             </button>
           ))}
           <button
             onClick={() => setMobileDrawerOpen(true)}
-            className="flex-1 flex flex-col items-center gap-0.5 py-2 text-[10px] text-muted-foreground transition-colors hover:text-[#7c9cff]"
+            className="flex-1 flex flex-col items-center gap-0.5 py-2.5 text-[10px] text-muted-foreground transition-all hover:text-[#7c9cff]"
           >
-            <span className="text-[18px]">•••</span>
-            More
+            <MoreHorizontal className="w-[18px]" />
+            <span className="font-medium">More</span>
           </button>
         </nav>
       </div>

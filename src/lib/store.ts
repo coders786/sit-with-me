@@ -111,11 +111,13 @@ export interface QuickNote {
   pinned: boolean
 }
 
-export interface QuickNote {
-  id: string
-  text: string
-  createdAt: number
-  pinned: boolean
+export interface LearningPathPhase {
+  phase: number
+  title: string
+  description: string
+  estimatedWeeks: number
+  milestones: Array<{ text: string; completed: boolean }>
+  resources: Array<{ title: string; url: string }>
 }
 
 interface AppState {
@@ -272,6 +274,15 @@ interface AppState {
   // Pomodoro Sound
   pomodoroSound: 'chime' | 'bell' | 'digital'
   setPomodoroSound: (sound: 'chime' | 'bell' | 'digital') => void
+
+  // Learning Path
+  learningPath: LearningPathPhase[]
+  setLearningPath: (path: LearningPathPhase[]) => void
+  toggleMilestone: (phaseIdx: number, milestoneIdx: number) => void
+
+  // Session Goal
+  sessionGoal: string | null
+  setSessionGoal: (goal: string | null) => void
 
   // Actions
   setView: (view: AppView) => void
@@ -516,6 +527,21 @@ export const useAppStore = create<AppState>()(
       pomodoroSound: 'chime' as const,
       setPomodoroSound: (sound) => set({ pomodoroSound: sound }),
 
+      // Learning Path
+      learningPath: [],
+      setLearningPath: (path) => set({ learningPath: path }),
+      toggleMilestone: (phaseIdx, milestoneIdx) => set((s) => ({
+        learningPath: s.learningPath.map((phase, pi) =>
+          pi === phaseIdx
+            ? { ...phase, milestones: phase.milestones.map((m, mi) => mi === milestoneIdx ? { ...m, completed: !m.completed } : m) }
+            : phase
+        ),
+      })),
+
+      // Session Goal
+      sessionGoal: null,
+      setSessionGoal: (goal) => set({ sessionGoal: goal }),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -548,6 +574,7 @@ export const useAppStore = create<AppState>()(
         sessionStartTime: null,
         dailyReviewReminders: true, autoGenerateFlashcards: false, defaultSessionDuration: 25 as const,
         currentlySpeakingId: null, learningStreakCalendar: {}, motivationalQuote: null, pomodoroSound: 'chime' as const,
+        learningPath: [], sessionGoal: null,
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -618,7 +645,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v11',
+      name: 'sitwithme-v12',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -678,6 +705,8 @@ export const useAppStore = create<AppState>()(
         motivationalQuote: state.motivationalQuote,
         pomodoroSound: state.pomodoroSound,
         quickNotesList: state.quickNotesList,
+        learningPath: state.learningPath,
+        sessionGoal: state.sessionGoal,
       }),
     }
   )
