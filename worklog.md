@@ -186,3 +186,116 @@ Verification:
 - Dev server compiled successfully (✓ Compiled)
 - All existing functionality preserved
 - Store persist key already at sitwithme-v6
+
+---
+Task ID: 5
+Agent: Main Agent (v7.0 Upgrade Round)
+Task: QA Testing, Major Feature Additions (Theme Toggle, Resources, Chat Search, Daily Challenge, Session Summary, Onboarding Progress, Framer Motion, Tooltips, Richer Sidebar, Better Empty States), Styling Enhancements
+
+Work Log:
+- Read worklog.md — v6.0 agentic was stable with all features working
+- Performed comprehensive QA testing with agent-browser:
+  - Landing page: ✅ v6.0 AGENTIC badge, feature cards, particles, signup/login
+  - Signup flow: ✅ Name input → Guest account → API key → Skip → Onboarding
+  - AI Onboarding: ✅ Progress indicator "Step 0/8 discovered", chat flow works
+  - Main App: ✅ All 8 tabs functional (Session, Plan, Tasks, Progress, Resources, Think, Room, Settings)
+  - Session tab: ✅ Daily Challenge Widget, Daily Check-in Widget, Summarize chip, Search chip
+  - Resources tab: ✅ Fetch Resources button, filter pills, card grid with 7 resources loaded
+  - Settings tab: ✅ Theme toggle (Dark/Light mode active), Voice, Auto-tasks, Auto-schedule
+  - Theme toggle: ✅ data-theme attribute switches between "dark" and "light"
+  - Sidebar: ✅ Richer user card with level badge, XP bar, streak, today's focus
+- No browser errors during testing
+- Lint check: ✅ 0 errors
+- Dev server running and responding with 200
+
+Store Updates (store.ts):
+- Added `AppTab 'resources'` to the union type
+- Added `SessionSummary` interface + `sessionSummaries` array + `addSessionSummary()`
+- Added `DailyChallenge` interface + `dailyChallenge` + `setDailyChallenge()` + `completeDailyChallenge()`
+- Persist key updated to `sitwithme-v7`
+- All new fields added to partialize for persistence
+
+New API Routes:
+- `POST /api/ai/challenge` — generates daily learning challenge based on user profile
+- `POST /api/ai/resources` — fetches learning resources based on user topic/level/style
+- `POST /api/ai/summary` — generates session summary from chat messages
+
+Major Features Implemented:
+1. **🌗 Dark/Light Theme Toggle**: 20+ CSS custom properties for light theme, data-theme attribute on root, Settings toggle + top bar quick-toggle, Sun/Moon icons
+2. **📚 Learning Resources View**: New tab with BookOpen icon, AI-powered resource fetching, filter pills (All/Video/Article/Interactive/Podcast), card grid with type icons, difficulty badges, external links
+3. **🔍 Chat Search**: Search bar in chat view, toggle with Search chip, case-insensitive filtering, highlight matching text with <mark>, result navigation, clear on Escape
+4. **🎯 Daily Challenge Widget**: Auto-fetches challenge from API, shows title/description/XP reward, Complete button with confetti + notification, gradient border styling
+5. **📋 Session Summary**: Summarize chip in composer, calls /api/ai/summary, modal with summary text + key points, saves to store
+6. **🎨 Onboarding Progress Indicator**: Progress bar at top of OnboardingScreen, counts 8 profile fields, "Step X/8 discovered" text, gradient bar
+7. **🎬 Framer Motion Transitions**: AnimatePresence + motion.div for tab switches and view transitions, fade+slide animations
+8. **💬 Radix Tooltips**: TooltipProvider wrapping app, tooltips on sidebar nav items, Focus button, Pomodoro widget, theme toggle, notification bell
+9. **🖼️ Richer Sidebar User Card**: Avatar with gradient border, level badge, mini XP progress bar, streak flame, today's focus text
+10. **Better Empty States**: Enhanced empty states for Tasks, Plan, Bookmarks, Resources with larger icons, clearer CTAs, helper text
+11. **Version Upgrade**: All v6.0 → v7.0 references, localStorage key v6 → v7, keyboard shortcuts 1-7 → 1-8
+
+Verification:
+- `bun run lint` passed with zero errors
+- Dev server running and serving pages correctly
+- All 8 tabs functional
+- Theme toggle works (data-theme switches between dark/light)
+- Resources view fetches and displays AI-generated resources
+- Daily challenge widget loads and can be completed
+- Onboarding progress bar visible
+- No console errors in browser
+
+Stage Summary:
+- App upgraded from v6.0 to v7.0 agentic
+- 11 major feature additions/improvements implemented
+- 3 new API routes added (challenge, resources, summary)
+- Store extended with sessionSummaries, dailyChallenge, resources tab
+- Now 8 tabs instead of 7 (Resources added)
+- Activated previously dormant packages: framer-motion, @radix-ui/react-tooltip
+- Light theme CSS fully implemented with 20+ variable overrides
+
+## Current Project Status
+
+The "Sit With Me" learning companion app is at **v7.0 AGENTIC** and is stable and feature-rich. The app is a full Next.js 16 single-page application with:
+
+- **8 main tabs**: Session, Plan, Tasks, Progress, Resources, Think Space, Room, Settings
+- **Complete auth flow**: Landing → Signup → API Key → AI Onboarding → Profile → Google Connect → Main App
+- **AI-powered features**: Chat mentor, onboarding extraction, plan generation, task extraction, resource curation, daily challenges, session summaries
+- **Rich UI**: Dark/Light theme, framer-motion transitions, Radix tooltips, glassmorphism, confetti, pomodoro timer, focus mode, command palette, keyboard shortcuts
+- **Gamification**: XP/Level system, achievement badges, daily challenges, streaks, weekly heatmap
+
+## Current Goals / Completed Modifications / Verification Results
+
+| Goal | Status | Notes |
+|------|--------|-------|
+| QA Testing | ✅ Complete | All flows tested via agent-browser, no errors |
+| Bug Fixes | ✅ No bugs found | Previous API bugs remain fixed |
+| Theme Toggle | ✅ Implemented | Dark/Light with 20+ CSS overrides, Settings + top bar toggle |
+| Resources View | ✅ Implemented | New tab, AI-powered, filtered by type |
+| Chat Search | ✅ Implemented | Search bar, highlighting, navigation |
+| Daily Challenge | ✅ Implemented | Auto-fetch, complete with confetti + XP |
+| Session Summary | ✅ Implemented | AI-generated from chat history |
+| Onboarding Progress | ✅ Implemented | Step X/8 with gradient bar |
+| Framer Motion | ✅ Implemented | Tab and view transitions |
+| Tooltips | ✅ Implemented | Radix tooltips on key elements |
+| Richer Sidebar | ✅ Implemented | Level, XP bar, streak, focus |
+| Better Empty States | ✅ Implemented | Enhanced for 4 views |
+| Lint Check | ✅ 0 errors | Clean code |
+| Dev Server | ✅ Running | Port 3000, responding 200 |
+
+## Unresolved Issues / Risks / Next Phase Recommendations
+
+### Unresolved Issues
+1. **Google OAuth not connected** — Currently uses demo mode. Needs real GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET for actual Google Calendar/Tasks/Gmail integration
+2. **API key persistence** — User's Gemini API key is stored server-side but not re-tested on app load
+3. **Onboarding can be slow** — AI onboarding may take 3-5 message rounds to extract all 8 profile fields
+4. **No real-time sync** — Room chat uses polling (5s interval) instead of WebSocket
+5. **Mobile navigation** — 8 tabs may be too many for mobile bottom nav; need bottom sheet drawer (vaul package is installed but not yet used)
+
+### Priority Recommendations for Next Phase
+1. **Mobile Bottom Sheet Navigation** — Use vaul (already installed) for a "More" drawer on mobile
+2. **Recharts Integration** — Use recharts (already installed) for progress charts instead of simple CSS bars
+3. **Google Calendar Push** — Implement actual Google Calendar event creation via API
+4. **Voice TTS Integration** — Use z-ai-web-dev-sdk TTS for speaking AI responses
+5. **React Syntax Highlighter** — Use react-syntax-highlighter (already installed) for code blocks in chat
+6. **Auto-task Extraction** — Automatic task creation from chat conversations when autoTasks is enabled
+7. **Hugging Face Deployment** — Deploy to HF Spaces for public access
+8. **GitHub Push** — Push v7.0 to coders786/sit-with-me repo

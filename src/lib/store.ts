@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type AppView = 'landing' | 'apikey' | 'onboarding' | 'profile' | 'googleconnect' | 'app'
-export type AppTab = 'session' | 'plan' | 'tasks' | 'progress' | 'room' | 'settings' | 'thinkspace'
+export type AppTab = 'session' | 'plan' | 'tasks' | 'progress' | 'resources' | 'room' | 'settings' | 'thinkspace'
 
 export interface ChatMsg {
   role: 'user' | 'assistant' | 'system'
@@ -65,6 +65,22 @@ export interface PomodoroState {
   timeLeft: number
   sessionsCompleted: number
   mode: 'work' | 'break'
+}
+
+export interface SessionSummary {
+  id: string
+  date: number
+  summary: string
+  keyPoints: string[]
+  xp: number
+}
+
+export interface DailyChallenge {
+  id: string
+  title: string
+  description: string
+  xpReward: number
+  completed: boolean
 }
 
 interface AppState {
@@ -162,6 +178,15 @@ interface AppState {
   // Theme
   theme: 'dark' | 'light'
   setTheme: (theme: 'dark' | 'light') => void
+
+  // Session Summaries
+  sessionSummaries: SessionSummary[]
+  addSessionSummary: (summary: SessionSummary) => void
+
+  // Daily Challenge
+  dailyChallenge: DailyChallenge | null
+  setDailyChallenge: (challenge: DailyChallenge | null) => void
+  completeDailyChallenge: () => void
 
   // Actions
   setView: (view: AppView) => void
@@ -318,6 +343,23 @@ export const useAppStore = create<AppState>()(
       theme: 'dark' as const,
       setTheme: (theme) => set({ theme }),
 
+      // Session Summaries
+      sessionSummaries: [],
+      addSessionSummary: (summary) => set((s) => ({
+        sessionSummaries: [...s.sessionSummaries, summary].slice(-20),
+      })),
+
+      // Daily Challenge
+      dailyChallenge: null,
+      setDailyChallenge: (challenge) => set({ dailyChallenge: challenge }),
+      completeDailyChallenge: () => set((s) => {
+        if (!s.dailyChallenge) return {}
+        return {
+          dailyChallenge: { ...s.dailyChallenge, completed: true },
+          xp: s.xp + s.dailyChallenge.xpReward,
+        }
+      }),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -345,6 +387,7 @@ export const useAppStore = create<AppState>()(
         pomodoroState: { running: false, timeLeft: 25 * 60, sessionsCompleted: 0, mode: 'work' as const },
         learningResources: [], bookmarkedMessages: [], focusMode: false,
         confettiActive: false, currentView: 'landing',
+        sessionSummaries: [], dailyChallenge: null,
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -415,7 +458,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v6',
+      name: 'sitwithme-v7',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -460,6 +503,8 @@ export const useAppStore = create<AppState>()(
         bookmarkedMessages: state.bookmarkedMessages,
         focusMode: state.focusMode,
         theme: state.theme,
+        sessionSummaries: state.sessionSummaries,
+        dailyChallenge: state.dailyChallenge,
       }),
     }
   )
