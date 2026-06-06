@@ -10,6 +10,7 @@ export interface ChatMsg {
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: number
+  replyToId?: string | null
 }
 
 export interface TaskItem {
@@ -284,6 +285,22 @@ interface AppState {
   sessionGoal: string | null
   setSessionGoal: (goal: string | null) => void
 
+  // Sidebar Collapse
+  sidebarCollapsed: boolean
+  setSidebarCollapsed: (collapsed: boolean) => void
+
+  // Replying To
+  replyingTo: string | null
+  setReplyingTo: (id: string | null) => void
+
+  // Welcome Dismissed
+  welcomeDismissed: boolean
+  setWelcomeDismissed: (dismissed: boolean) => void
+
+  // Daily Minutes Logged
+  dailyMinutesLogged: number
+  addDailyMinutes: (minutes: number) => void
+
   // Actions
   setView: (view: AppView) => void
   setTab: (tab: AppTab) => void
@@ -542,6 +559,22 @@ export const useAppStore = create<AppState>()(
       sessionGoal: null,
       setSessionGoal: (goal) => set({ sessionGoal: goal }),
 
+      // Sidebar Collapse
+      sidebarCollapsed: false,
+      setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+
+      // Replying To
+      replyingTo: null,
+      setReplyingTo: (id) => set({ replyingTo: id }),
+
+      // Welcome Dismissed
+      welcomeDismissed: false,
+      setWelcomeDismissed: (dismissed) => set({ welcomeDismissed: dismissed }),
+
+      // Daily Minutes Logged
+      dailyMinutesLogged: 0,
+      addDailyMinutes: (minutes) => set((s) => ({ dailyMinutesLogged: s.dailyMinutesLogged + minutes })),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -575,6 +608,7 @@ export const useAppStore = create<AppState>()(
         dailyReviewReminders: true, autoGenerateFlashcards: false, defaultSessionDuration: 25 as const,
         currentlySpeakingId: null, learningStreakCalendar: {}, motivationalQuote: null, pomodoroSound: 'chime' as const,
         learningPath: [], sessionGoal: null,
+        sidebarCollapsed: false, replyingTo: null, welcomeDismissed: false, dailyMinutesLogged: 0,
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -645,7 +679,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v12',
+      name: 'sitwithme-v13',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -707,6 +741,10 @@ export const useAppStore = create<AppState>()(
         quickNotesList: state.quickNotesList,
         learningPath: state.learningPath,
         sessionGoal: state.sessionGoal,
+        sidebarCollapsed: state.sidebarCollapsed,
+        replyingTo: state.replyingTo,
+        welcomeDismissed: state.welcomeDismissed,
+        dailyMinutesLogged: state.dailyMinutesLogged,
       }),
     }
   )

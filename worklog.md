@@ -698,3 +698,48 @@ The "Sit With Me" learning companion app is at **v12.0 AGENTIC** and is stable. 
 5. **Accessibility Audit** — Ensure WCAG 2.1 AA compliance
 6. **PWA Support** — Add service worker, offline mode, install prompt
 7. **Performance Optimization** — Code splitting, lazy loading for heavy components
+
+---
+Task ID: 12-a
+Agent: Full-Stack Developer
+Task: v13.0 Features + Styling Improvements
+
+Work Log:
+- Read worklog.md, store.ts, page.tsx to understand v12.0 codebase
+- Updated Zustand store (store.ts) with new state fields:
+  - `sidebarCollapsed: boolean` + `setSidebarCollapsed()`
+  - `replyingTo: string | null` (message ID) + `setReplyingTo()`
+  - `welcomeDismissed: boolean` + `setWelcomeDismissed()`
+  - `dailyMinutesLogged: number` + `addDailyMinutes()`
+  - Added `replyToId?: string | null` to ChatMsg interface
+  - Updated persist key from `sitwithme-v12` to `sitwithme-v13`
+  - Added all new fields to partialize for persistence
+  - Added new fields to clearAuth reset
+- Updated all version references from v12.0 to v13.0 (landing badge, sidebar footer, settings, command palette export, data export, localStorage keys)
+
+Major Features Implemented:
+1. **Animated Welcome Back Screen**: Replaced simple welcome overlay with enhanced version featuring user name in large gradient text, typing animation for personalized message ("Welcome back, [Name]! Ready to continue learning [Topic]?"), progress preview (Level, XP, Streak), quick action buttons ("Continue Session", "Review Flashcards", "View Progress"), auto-dismisses after 4 seconds or on click, uses `welcomeDismissed` store field to prevent repeated showing
+2. **Learning Path Visualization**: Added new section in Progress tab with vertical timeline/tree structure showing 5 milestones (Week 1-5+), each node connected by animated gradient line, current position highlighted with glowing pulse indicator (`pathNodePulse` animation), completed milestones show ✓ with gradient styling and "Done" badge, upcoming milestones show number with muted border, line-through on completed titles
+3. **Interactive Code Playground**: Added "Run" button alongside "Copy" on code blocks when language is JavaScript/TypeScript, clicking "Run" evaluates code using `new Function()` with try/catch, mock console captures `console.log/warn/error` output, output shows in terminal-style dark panel below code block, errors shown with red styling, success output shown with green terminal styling, shared state via `codePlaygroundOutputs` with reactive updates via `CodePlaygroundOutput` component
+4. **Social Learning Stats Card**: Enhanced sidebar user card with animated SVG ring chart showing daily goal completion (X/30 min today), mini sparkline chart showing last 7 days of activity from learningStreakCalendar, rank badge system (🌱 Novice < ⚡ Apprentice < 📚 Scholar < 🎓 Expert < 👑 Master) based on XP thresholds, hover tooltip with detailed stats (XP, Level, Streak, Daily minutes, Tasks done, Rank)
+5. **Chat Message Threading/Reply**: Added "↩ Reply" button on hover for both assistant and user messages, clicking Reply sets `replyingTo` in store and shows quoted text above input with "Replying to:" indicator, X button to cancel reply, sent messages include `replyToId` field, replies display with left border accent and quoted reference showing ↩ + truncated original text
+6. **Keyboard Shortcut Enhancements**: Added Ctrl+/ to toggle sidebar collapse, Ctrl+Shift+P to start/stop Pomodoro timer, Ctrl+E to export current view as text to clipboard (supports Session/Tasks/Progress/Plan tabs), updated KeyboardShortcutsModal to show all 9 shortcuts, implemented sidebar collapse functionality with animated width transition (w-60 ↔ w-14), collapsed sidebar shows icon-only nav with tooltips, collapse toggle button at footer with ChevronLeft/ChevronRight icons
+
+Verification:
+- `bun run lint` — 0 errors
+- Dev server compiling and responding with 200
+- All existing functionality preserved
+- Store persist key updated to sitwithme-v13
+
+Stage Summary:
+- App upgraded from v12.0 to v13.0 AGENTIC
+- 6 major feature/styling categories implemented
+- Welcome back screen with typing animation, progress preview, quick actions
+- Learning path visualization with 5-milestone vertical timeline
+- Interactive code playground with Run/Copy buttons on JS/TS code blocks
+- Social learning stats card with ring chart, sparkline, rank badges, tooltips
+- Chat message threading with reply functionality and visual connections
+- Keyboard shortcuts expanded (Ctrl+/, Ctrl+Shift+P, Ctrl+E)
+- Sidebar collapse with animated transition and icon-only mode
+- Store extended with sidebarCollapsed, replyingTo, welcomeDismissed, dailyMinutesLogged, replyToId
+- Persist key updated to sitwithme-v13

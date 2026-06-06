@@ -21,7 +21,7 @@ import {
   Search, RotateCcw, Wand2, LayoutList, BarChart3, MonitorSmartphone,
   Lightbulb, Code2, Palette, Hash, Bell, Copy, CheckCheck, Filter,
   Clipboard, Download, Lock, Unlock, BookOpen, Sun, Moon, BookMarked,
-  ExternalLink, ChevronUp, ChevronDown, Loader2, ArrowDown, Quote, Headphones,
+  ExternalLink, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, Loader2, ArrowDown, Quote, Headphones,
   Map, Share2, Award, AlertTriangle, Info, MoreHorizontal
 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -113,6 +113,49 @@ function timeAgo(ts: number): string {
 }
 
 /* ========================================================================
+   CODE PLAYGROUND STATE - shared across all renderMarkdown calls
+   ======================================================================== */
+const codePlaygroundOutputs: Record<string, { output: string; isError: boolean }> = {}
+let codePlaygroundSetters: Array<() => void> = []
+
+function CodePlaygroundOutput({ codeId }: { codeId: string }) {
+  const [, forceUpdate] = useState(0)
+  useEffect(() => {
+    const setter = () => forceUpdate(c => c + 1)
+    codePlaygroundSetters.push(setter)
+    return () => { codePlaygroundSetters = codePlaygroundSetters.filter(s => s !== setter) }
+  }, [])
+  const result = codePlaygroundOutputs[codeId]
+  if (!result) return null
+  return (
+    <div className={`mt-1 rounded-lg p-2.5 text-xs font-mono max-h-40 overflow-auto custom-scrollbar ${result.isError ? 'bg-[#ff8a8a]/10 border border-[#ff8a8a]/20 text-[#ff8a8a]' : 'bg-[#0a0b0e] border border-[#272b34] text-[#5fd0a0]'}`}>
+      <div className="flex items-center gap-1 mb-1">
+        <span className={`w-1.5 h-1.5 rounded-full ${result.isError ? 'bg-[#ff8a8a]' : 'bg-[#5fd0a0]'}`} />
+        <span className="text-[9px] text-muted-foreground">{result.isError ? 'Error' : 'Output'}</span>
+      </div>
+      <pre className="whitespace-pre-wrap">{result.output}</pre>
+    </div>
+  )
+}
+
+function runCodePlayground(code: string, codeId: string) {
+  try {
+    // Capture console.log output
+    const logs: string[] = []
+    const mockConsole = { log: (...args: unknown[]) => logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' ')), error: (...args: unknown[]) => logs.push('Error: ' + args.map(a => String(a)).join(' ')), warn: (...args: unknown[]) => logs.push('Warn: ' + args.map(a => String(a)).join(' ')) }
+    const fn = new Function('console', `"use strict";\n${code}`)
+    const result = fn(mockConsole)
+    let output = logs.join('\n')
+    if (result !== undefined && !logs.length) output = String(result)
+    if (!output) output = '(no output)'
+    codePlaygroundOutputs[codeId] = { output, isError: false }
+  } catch (err: unknown) {
+    codePlaygroundOutputs[codeId] = { output: (err as Error).message || String(err), isError: true }
+  }
+  codePlaygroundSetters.forEach(s => s())
+}
+
+/* ========================================================================
    IMPROVED MARKDOWN RENDERER
    ======================================================================== */
 function renderMarkdown(text: string): React.ReactNode {
@@ -130,18 +173,30 @@ function renderMarkdown(text: string): React.ReactNode {
       const code = firstNewline > 0 ? inner.slice(firstNewline + 1) : inner
       const safeLang = lang || 'text'
       const codeId = `code-${key}`
+      const isRunnable = safeLang === 'javascript' || safeLang === 'js' || safeLang === 'typescript' || safeLang === 'ts'
       try {
         result.push(
           <div key={key++} className="code-block-wrapper">
             <SyntaxHighlighter language={safeLang} style={oneDark} className="rounded-lg my-2 text-xs">
               {code}
             </SyntaxHighlighter>
-            <button
-              className="code-copy-btn bg-[#272b34] hover:bg-[#3a3f4b] rounded px-2 py-1 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
-              onClick={() => { navigator.clipboard.writeText(code); toast.success('Code copied!') }}
-            >
-              <Copy className="w-3 h-3" /> Copy
-            </button>
+            <div className="code-copy-btn flex items-center gap-1">
+              <button
+                className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-2 py-1 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
+                onClick={() => { navigator.clipboard.writeText(code); toast.success('Code copied!') }}
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+              {isRunnable && (
+                <button
+                  className="bg-[#5fd0a0]/20 hover:bg-[#5fd0a0]/30 rounded px-2 py-1 text-[10px] text-[#5fd0a0] flex items-center gap-1 transition-colors"
+                  onClick={() => runCodePlayground(code, codeId)}
+                >
+                  <Zap className="w-3 h-3" /> Run
+                </button>
+              )}
+            </div>
+            <CodePlaygroundOutput codeId={codeId} />
           </div>
         )
       } catch {
@@ -150,12 +205,23 @@ function renderMarkdown(text: string): React.ReactNode {
             <pre className="bg-[#272b34] text-[#c5d0ff] p-3 rounded-lg my-2 text-xs overflow-x-auto">
               <code>{code}</code>
             </pre>
-            <button
-              className="code-copy-btn bg-[#272b34] hover:bg-[#3a3f4b] rounded px-2 py-1 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
-              onClick={() => { navigator.clipboard.writeText(code); toast.success('Code copied!') }}
-            >
-              <Copy className="w-3 h-3" /> Copy
-            </button>
+            <div className="code-copy-btn flex items-center gap-1">
+              <button
+                className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-2 py-1 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
+                onClick={() => { navigator.clipboard.writeText(code); toast.success('Code copied!') }}
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+              {isRunnable && (
+                <button
+                  className="bg-[#5fd0a0]/20 hover:bg-[#5fd0a0]/30 rounded px-2 py-1 text-[10px] text-[#5fd0a0] flex items-center gap-1 transition-colors"
+                  onClick={() => runCodePlayground(code, codeId)}
+                >
+                  <Zap className="w-3 h-3" /> Run
+                </button>
+              )}
+            </div>
+            <CodePlaygroundOutput codeId={codeId} />
           </div>
         )
       }
@@ -651,6 +717,7 @@ function GlobalStyles() {
       .step-icon-bob:nth-child(3) { animation-delay: 0.6s; }
 
       /* Light Theme Overrides */
+      html[data-theme="light"],
       [data-theme="light"] {
         --theme-bg: #f8f9fb;
         --theme-bg-secondary: #ffffff;
@@ -679,6 +746,16 @@ function GlobalStyles() {
         --theme-glass-bg: rgba(255, 255, 255, 0.7);
         --theme-glass-border: rgba(0, 0, 0, 0.08);
       }
+      html[data-theme="light"] body,
+      html[data-theme="light"] .bg-\\[\\#0e0f13\\] { background-color: #f8f9fb !important; }
+      html[data-theme="light"] .bg-\\[\\#15171d\\] { background-color: #f3f4f6 !important; }
+      html[data-theme="light"] .bg-\\[\\#191c23\\] { background-color: #ffffff !important; }
+      html[data-theme="light"] .bg-\\[\\#1d2129\\] { background-color: #f3f4f6 !important; }
+      html[data-theme="light"] .bg-\\[\\#1f232c\\] { background-color: #e8eaed !important; }
+      html[data-theme="light"] .border-\\[\\#272b34\\] { border-color: #e5e7eb !important; }
+      html[data-theme="light"] .text-\\[\\#eef0f4\\] { color: #1a1c23 !important; }
+      html[data-theme="light"] .text-\\[\\#c5d0ff\\] { color: #4338ca !important; }
+      html[data-theme="light"] .text-muted-foreground { color: #6b7280 !important; }
       [data-theme="light"] .bg-\\[\\#0e0f13\\] { background-color: #f8f9fb !important; }
       [data-theme="light"] .bg-\\[\\#15171d\\] { background-color: #f3f4f6 !important; }
       [data-theme="light"] .bg-\\[\\#191c23\\] { background-color: #ffffff !important; }
@@ -688,20 +765,23 @@ function GlobalStyles() {
       [data-theme="light"] .text-\\[\\#eef0f4\\] { color: #1a1c23 !important; }
       [data-theme="light"] .text-\\[\\#c5d0ff\\] { color: #4338ca !important; }
       [data-theme="light"] .text-muted-foreground { color: #6b7280 !important; }
-      [data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb { background: #c7c8cc; }
-      [data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
-      [data-theme="light"] .bubble-gradient-assistant { background: linear-gradient(135deg, #f3f4f6 0%, #e8eaed 100%); }
-      [data-theme="light"] .bubble-gradient-user { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%); }
-      [data-theme="light"] .sidebar-active { background: rgba(99,102,241,0.08) !important; border-left-color: #6366f1; }
-      [data-theme="light"] .glass { background: rgba(255,255,255,0.7); border-color: rgba(0,0,0,0.08); }
+      html[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb { background: #c7c8cc; }
+      html[data-theme="light"] .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #a1a1aa; }
+      html[data-theme="light"] .bubble-gradient-assistant { background: linear-gradient(135deg, #f3f4f6 0%, #e8eaed 100%) !important; }
+      html[data-theme="light"] .bubble-gradient-user { background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%) !important; }
+      html[data-theme="light"] .sidebar-active { background: rgba(99,102,241,0.08) !important; border-left-color: #6366f1; }
+      html[data-theme="light"] .glass { background: rgba(255,255,255,0.7) !important; border-color: rgba(0,0,0,0.08) !important; }
       [data-theme="light"] .grid-bg {
         background-image:
           linear-gradient(rgba(99,102,241,0.05) 1px, transparent 1px),
           linear-gradient(90deg, rgba(99,102,241,0.05) 1px, transparent 1px);
       }
       /* Light Theme - Aurora background */
+      html[data-theme="light"].aurora-bg,
+      html[data-theme="light"] .aurora-bg,
+      [data-theme="light"].aurora-bg,
       [data-theme="light"] .aurora-bg {
-        background: linear-gradient(135deg, #f8f9fb, #eef0f5, #f3f4f8, #f0f1f6);
+        background: linear-gradient(135deg, #f8f9fb, #eef0f5, #f3f4f8, #f0f1f6) !important;
         background-size: 400% 400%;
         animation: aurora 15s ease infinite;
       }
@@ -837,7 +917,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'export-data', label: 'Export Data', icon: <Download className="w-4 h-4" />, desc: 'Download all data as JSON', action: () => {
       const state = useAppStore.getState()
       const data = {
-        exportDate: new Date().toISOString(), version: '12.0',
+        exportDate: new Date().toISOString(), version: '13.0',
         profile: state.profile, topic: state.topic, vision: state.vision,
         tasks: state.tasks, reviewCards: state.reviewCards, moodLogs: state.moodLogs,
         chatMessages: state.chatMessages, quickNotes: state.quickNotes,
@@ -859,7 +939,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v12'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v13'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -983,6 +1063,9 @@ function KeyboardShortcutsModal({ open, onClose }: { open: boolean; onClose: () 
     { keys: '⌘Enter', desc: 'Send message' },
     { keys: '1-9', desc: 'Switch tabs' },
     { keys: '⇧⌘F', desc: 'Focus Mode' },
+    { keys: 'Ctrl+/', desc: 'Toggle sidebar' },
+    { keys: 'Ctrl+⇧P', desc: 'Start/Stop Pomodoro' },
+    { keys: 'Ctrl+E', desc: 'Export current view' },
     { keys: '?', desc: 'Show shortcuts' },
     { keys: 'Esc', desc: 'Close modal/palette' },
   ]
@@ -1048,6 +1131,56 @@ function useKeyboardShortcuts() {
         e.preventDefault()
         const currentStore = useAppStore.getState()
         currentStore.setFocusMode(!currentStore.focusMode)
+      }
+      // Ctrl+/ to toggle sidebar collapse
+      if (e.ctrlKey && e.key === '/') {
+        e.preventDefault()
+        const currentStore = useAppStore.getState()
+        if (currentStore.currentView === 'app') {
+          currentStore.setSidebarCollapsed(!currentStore.sidebarCollapsed)
+        }
+      }
+      // Ctrl+Shift+P to start/stop Pomodoro
+      if (e.shiftKey && e.ctrlKey && (e.key === 'P' || e.key === 'p')) {
+        e.preventDefault()
+        const currentStore = useAppStore.getState()
+        if (currentStore.pomodoroState.running) {
+          currentStore.setPomodoroState({ running: false })
+          toast.info('Pomodoro stopped')
+        } else {
+          const dur = currentStore.defaultSessionDuration
+          currentStore.setPomodoroState({ running: true, timeLeft: dur * 60, mode: 'work' })
+          toast.success(`Pomodoro started! ${dur} min focus.`)
+        }
+      }
+      // Ctrl+E to export current view as text
+      if (e.ctrlKey && e.key === 'e' && !e.shiftKey) {
+        e.preventDefault()
+        const currentStore = useAppStore.getState()
+        let exportText = `Sit With Me - ${currentStore.currentTab} View Export\n`
+        exportText += `Date: ${new Date().toLocaleString()}\n`
+        exportText += `Topic: ${currentStore.topic || 'N/A'}\n\n`
+        if (currentStore.currentTab === 'session') {
+          exportText += '=== Chat Messages ===\n'
+          currentStore.chatMessages.forEach(m => {
+            exportText += `[${m.role.toUpperCase()}] ${m.content}\n\n`
+          })
+        } else if (currentStore.currentTab === 'tasks') {
+          exportText += '=== Tasks ===\n'
+          currentStore.tasks.forEach(t => {
+            exportText += `[${t.status.toUpperCase()}] ${t.title}${t.priority ? ` (${t.priority})` : ''}\n`
+          })
+        } else if (currentStore.currentTab === 'progress') {
+          exportText += `Sessions: ${currentStore.sessionCount}\nWins: ${currentStore.wins}\nStreak: ${currentStore.successStreak}\nXP: ${currentStore.xp}\nLevel: ${Math.floor(currentStore.xp / 100) + 1}\n`
+        } else if (currentStore.currentTab === 'plan' && currentStore.planWeek) {
+          exportText += '=== Learning Plan ===\n'
+          currentStore.planWeek.forEach(d => {
+            exportText += `${d.day}: ${d.focus} (${d.minutes}min)\n`
+          })
+        } else {
+          exportText += `Current tab: ${currentStore.currentTab}\n`
+        }
+        navigator.clipboard.writeText(exportText).then(() => toast.success('View exported to clipboard!'))
       }
     }
     window.addEventListener('keydown', handleKey)
@@ -1656,7 +1789,7 @@ function LandingScreen() {
           <Orb />
         </div>
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v12.0 AGENTIC
+          v13.0 AGENTIC
         </Badge>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 gradient-text">
           sit with me
@@ -3211,7 +3344,9 @@ function ChatSessionView() {
     const msg = input.trim()
     if (!msg || store.chatBusy) return
     setInput('')
-    store.addChatMessage({ role: 'user', content: msg, timestamp: Date.now() })
+    const replyToId = store.replyingTo
+    store.setReplyingTo(null)
+    store.addChatMessage({ role: 'user', content: msg, timestamp: Date.now(), replyToId })
     store.setChatBusy(true)
 
     try {
@@ -3495,12 +3630,24 @@ function ChatSessionView() {
                       ? 'bg-transparent border border-dashed border-[#272b34] text-muted-foreground text-xs max-w-[90%] px-4 py-3 rounded-2xl'
                       : 'bubble-gradient-assistant text-foreground rounded-2xl rounded-tl-sm px-4 py-3 text-sm border-l-2 border-l-[#7c9cff]/60 hover:shadow-[0_0_15px_rgba(124,156,255,0.15)] transition-shadow duration-300'
                 }`}>
+                  {/* Reply reference */}
+                  {msg.replyToId && (() => {
+                    const replyIdx = parseInt(msg.replyToId.replace('msg-', ''))
+                    const replyMsg = store.chatMessages[replyIdx]
+                    if (!replyMsg) return null
+                    return (
+                      <div className="flex items-start gap-1.5 mb-2 p-1.5 rounded-md bg-[#0e0f13]/40 border-l-2 border-[#9d7cff]/50">
+                        <span className="text-[9px] text-[#9d7cff] shrink-0">↩</span>
+                        <p className="text-[10px] text-muted-foreground line-clamp-2">{replyMsg.content.slice(0, 80)}{replyMsg.content.length > 80 ? '...' : ''}</p>
+                      </div>
+                    )
+                  })()}
                   {searchQuery.trim() ? highlightText(msg.content) : (msg.role === 'assistant' ? renderMarkdown(msg.content) : msg.content)}
                   {/* Timestamp */}
                   <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
                     {timeAgo(msg.timestamp)}
                   </div>
-                  {/* Copy & Bookmark & Reaction & TTS buttons on assistant messages */}
+                  {/* Copy & Bookmark & Reaction & TTS & Reply buttons on assistant messages */}
                   {msg.role === 'assistant' && (
                     <div className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
                       {/* Message Reactions with counts */}
@@ -3547,6 +3694,24 @@ function ChatSessionView() {
                       }} className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] flex items-center gap-1 ${store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? 'text-[#ffce6b]' : 'text-muted-foreground'}`}>
                         <Star className="w-3 h-3" fill={store.bookmarkedMessages.some(b => b.id === `msg-${i}`) ? '#ffce6b' : 'none'} />
                       </button>
+                      {/* Reply button */}
+                      <button
+                        onClick={() => store.setReplyingTo(`msg-${i}`)}
+                        className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
+                      >
+                        ↩ Reply
+                      </button>
+                    </div>
+                  )}
+                  {/* Reply button on user messages */}
+                  {msg.role === 'user' && (
+                    <div className="absolute -bottom-1 left-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => store.setReplyingTo(`msg-${i}`)}
+                        className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1 transition-colors"
+                      >
+                        ↩ Reply
+                      </button>
                     </div>
                   )}
                 </div>
@@ -3586,6 +3751,21 @@ function ChatSessionView() {
       {/* Composer */}
       <div className="border-t border-[#272b34] p-4">
         <div className="max-w-3xl mx-auto">
+          {/* Reply indicator */}
+          {store.replyingTo && (() => {
+            const replyIdx = parseInt(store.replyingTo.replace('msg-', ''))
+            const replyMsg = store.chatMessages[replyIdx]
+            if (!replyMsg) return null
+            return (
+              <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-[#9d7cff]/5 border border-[#9d7cff]/20 animate-slideUp">
+                <span className="text-[10px] text-[#9d7cff] shrink-0">↩ Replying to:</span>
+                <p className="text-[11px] text-muted-foreground flex-1 truncate">{replyMsg.content.slice(0, 100)}</p>
+                <button onClick={() => store.setReplyingTo(null)} className="text-muted-foreground hover:text-foreground shrink-0">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )
+          })()}
           <div className="flex gap-2 chat-input-glow rounded-lg">
             <Textarea
               value={input}
@@ -4510,6 +4690,58 @@ function ProgressView() {
       </Card>
 
       <ShareAchievementModal open={shareModalOpen} onClose={() => setShareModalOpen(false)} />
+
+      {/* Learning Path Visualization */}
+      <Card className="bg-[#191c23] border-[#272b34] card-hover card-shine mb-4">
+        <CardContent className="p-4">
+          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-4">Learning Path</p>
+          <div className="relative pl-6">
+            {/* Vertical connecting line */}
+            <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-gradient-to-b from-[#7c9cff] via-[#9d7cff] to-[#272b34]" />
+            {/* Milestone nodes */}
+            {(() => {
+              const milestones = [
+                { week: 'Week 1', title: 'Getting Started', desc: 'Setup & basics', completed: totalSessions >= 1 },
+                { week: 'Week 2', title: 'Building Foundations', desc: 'Core concepts', completed: totalSessions >= 3 || wins >= 2 },
+                { week: 'Week 3', title: 'Deepening Knowledge', desc: 'Practice & application', completed: totalSessions >= 5 || wins >= 5 },
+                { week: 'Week 4', title: 'Advancing Skills', desc: 'Complex topics', completed: level >= 3 || xp >= 200 },
+                { week: 'Week 5+', title: 'Mastery Path', desc: 'Expert territory', completed: xp >= 500 },
+              ]
+              const currentIdx = milestones.findIndex(m => !m.completed)
+              return milestones.map((m, idx) => {
+                const isCurrent = idx === currentIdx
+                const isCompleted = m.completed
+                return (
+                  <div key={m.week} className="relative mb-4 last:mb-0" style={{ animation: isCurrent ? 'pathNodePulse 2s ease-in-out infinite' : 'none' }}>
+                    {/* Node circle */}
+                    <div className={`absolute -left-6 top-1 w-[22px] h-[22px] rounded-full flex items-center justify-center text-[10px] z-10 ${
+                      isCompleted ? 'bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13]' :
+                      isCurrent ? 'bg-[#191c23] border-2 border-[#7c9cff] text-[#7c9cff] shadow-[0_0_12px_rgba(124,156,255,0.4)]' :
+                      'bg-[#191c23] border-2 border-[#272b34] text-muted-foreground'
+                    }`}>
+                      {isCompleted ? '✓' : idx + 1}
+                    </div>
+                    {/* Content */}
+                    <div className={`ml-2 p-2.5 rounded-lg border transition-colors ${
+                      isCurrent ? 'bg-[#7c9cff]/5 border-[#7c9cff]/30' :
+                      isCompleted ? 'bg-[#191c23] border-[#272b34]/50 opacity-70' :
+                      'bg-[#191c23] border-[#272b34]/30'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-muted-foreground font-mono">{m.week}</span>
+                        {isCurrent && <span className="text-[8px] bg-[#7c9cff]/20 text-[#7c9cff] px-1.5 py-0.5 rounded-full font-semibold">Current</span>}
+                        {isCompleted && <span className="text-[8px] bg-[#5fd0a0]/20 text-[#5fd0a0] px-1.5 py-0.5 rounded-full font-semibold">Done</span>}
+                      </div>
+                      <p className={`text-xs font-semibold mt-0.5 ${isCompleted ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{m.title}</p>
+                      <p className="text-[10px] text-muted-foreground">{m.desc}</p>
+                    </div>
+                  </div>
+                )
+              })
+            })()}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -5237,14 +5469,14 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v12')
+    localStorage.removeItem('sitwithme-v13')
     window.location.reload()
   }
 
   const handleExportData = () => {
     const data = {
       exportDate: new Date().toISOString(),
-      version: '12.0',
+      version: '13.0',
       profile: store.profile,
       topic: store.topic,
       vision: store.vision,
@@ -5516,7 +5748,7 @@ function SettingsView() {
 
           <div className="gradient-divider" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 12.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 13.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -5693,16 +5925,16 @@ function MainApp() {
       <KeyboardShortcutsModal open={kbShortcuts.open} onClose={kbShortcuts.close} />
 
       {/* Sidebar - Desktop */}
-      <aside className="hidden sm:flex w-60 bg-[#15171d] border-r border-[#272b34] flex-col shrink-0 noise-overlay">
+      <aside className={`hidden sm:flex bg-[#15171d] border-r border-[#272b34] flex-col shrink-0 noise-overlay transition-all duration-300 ${store.sidebarCollapsed ? 'w-14' : 'w-60'}`}>
         {/* Brand with gradient */}
         <div className="p-4 flex items-center gap-2.5" style={{ background: 'linear-gradient(135deg, rgba(124,156,255,0.08), rgba(157,124,255,0.08))' }}>
-          <div className="w-7 h-7 rounded-lg"
+          <div className="w-7 h-7 rounded-lg shrink-0"
             style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }} />
-          <span className="font-semibold text-sm gradient-text">sit with me</span>
+          {!store.sidebarCollapsed && <span className="font-semibold text-sm gradient-text">sit with me</span>}
         </div>
 
         {/* Goal Card */}
-        {store.vision && (
+        {!store.sidebarCollapsed && store.vision && (
           <div className="mx-2.5 mb-2 bg-[#191c23] border border-[#272b34] rounded-xl p-3 card-hover">
             <p className="text-[10px] text-muted-foreground uppercase tracking-widest">your goal</p>
             <p className="text-xs mt-1">{store.vision}</p>
@@ -5710,64 +5942,124 @@ function MainApp() {
         )}
 
         {/* Nav */}
-        <nav className="flex-1 px-2.5 py-1 space-y-0.5 overflow-auto custom-scrollbar">
+        <nav className="flex-1 px-1 py-1 space-y-0.5 overflow-auto custom-scrollbar">
           {navItems.map((item, idx) => (
             <TooltipPrimitive.Root key={item.id}>
               <TooltipPrimitive.Trigger asChild>
                 <button
                   onClick={() => store.setTab(item.id)}
                   className={`flex items-center gap-3 w-full text-left rounded-lg text-sm transition-all ${
+                    store.sidebarCollapsed ? 'justify-center px-0 py-2.5' : 'px-2.5 py-2'
+                  } ${
                     store.currentTab === item.id
                       ? 'sidebar-active text-foreground animate-slideInLeft'
                       : 'sidebar-inactive text-muted-foreground hover:bg-[#191c23] hover:text-foreground'
                   }`}
                 >
                   {item.icon}
-                  {item.label}
-                  {store.currentTab === item.id && <span className="sidebar-active-dot" />}
-                  <span className="ml-auto text-[10px] text-muted-foreground/40">{idx + 1}</span>
+                  {!store.sidebarCollapsed && (
+                    <>
+                      {item.label}
+                      {store.currentTab === item.id && <span className="sidebar-active-dot" />}
+                      <span className="ml-auto text-[10px] text-muted-foreground/40">{idx + 1}</span>
+                    </>
+                  )}
                 </button>
               </TooltipPrimitive.Trigger>
-              <TooltipPrimitive.Content side="right" className="bg-[#191c23] border border-[#272b34] text-xs px-2 py-1 rounded-md z-[200]">
-                {item.label} <span className="text-muted-foreground ml-1">[{idx + 1}]</span>
-              </TooltipPrimitive.Content>
+              {store.sidebarCollapsed && (
+                <TooltipPrimitive.Content side="right" className="bg-[#191c23] border border-[#272b34] text-xs px-2 py-1 rounded-md z-[200]">
+                  {typeof item.label === 'string' ? item.label : item.id} <span className="text-muted-foreground ml-1">[{idx + 1}]</span>
+                </TooltipPrimitive.Content>
+              )}
             </TooltipPrimitive.Root>
           ))}
         </nav>
 
-        {/* Richer User Card */}
+        {/* Richer User Card with Social Learning Stats */}
+        {!store.sidebarCollapsed && (
         <div className="p-2.5 border-t border-[#272b34]">
-          <div className="gradient-border-animated bg-[#191c23] rounded-xl p-3 card-hover">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-[#0e0f13] avatar-ring"
-                style={{ background: 'linear-gradient(135deg, #9d7cff, #7c9cff)' }}>
-                {avatarInitial}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-semibold truncate">{displayName}</span>
-                  <Badge className="text-[8px] bg-[#9d7cff]/15 text-[#9d7cff] border-0 px-1 py-0">Lv.{Math.floor(store.xp / 100) + 1}</Badge>
+          <TooltipPrimitive.Root>
+            <TooltipPrimitive.Trigger asChild>
+              <div className="gradient-border-animated bg-[#191c23] rounded-xl p-3 card-hover cursor-default">
+                <div className="flex items-center gap-2.5">
+                  {/* Animated ring chart for daily goal */}
+                  <div className="relative w-10 h-10 shrink-0">
+                    <svg viewBox="0 0 40 40" className="w-full h-full -rotate-90">
+                      <defs>
+                        <linearGradient id="dailyGoalGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                          <stop offset="0%" stopColor="#7c9cff" />
+                          <stop offset="100%" stopColor="#9d7cff" />
+                        </linearGradient>
+                      </defs>
+                      <circle cx="20" cy="20" r="16" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                      <circle cx="20" cy="20" r="16" fill="none" stroke="url(#dailyGoalGrad)" strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeDasharray={`${Math.PI * 32}`}
+                        strokeDashoffset={`${Math.PI * 32 * (1 - Math.min(1, store.dailyMinutesLogged / 30))}`}
+                        style={{ transition: 'stroke-dashoffset 0.8s ease-out' }}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-[8px] font-bold text-[#7c9cff]">{Math.min(store.dailyMinutesLogged, 30)}/30</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold truncate">{displayName}</span>
+                      {(() => {
+                        const rank = getRank(store.xp)
+                        return <Badge className="text-[8px] border-0 px-1 py-0" style={{ backgroundColor: rank.color + '22', color: rank.color }}>{rank.icon} {rank.title}</Badge>
+                      })()}
+                    </div>
+                    {/* Mini sparkline chart - last 7 days */}
+                    <div className="flex items-end gap-px h-4 mt-1">
+                      {[0,1,2,3,4,5,6].map(d => {
+                        const dayKey = new Date(Date.now() - (6 - d) * 86400000).toISOString().split('T')[0]
+                        const active = store.learningStreakCalendar[dayKey]
+                        const height = active ? 100 : 20 + (d * 7 % 40)
+                        return (
+                          <div key={d} className="flex-1 rounded-sm" style={{
+                            height: `${height}%`,
+                            background: active ? 'linear-gradient(to top, #7c9cff, #9d7cff)' : 'rgba(124,156,255,0.12)',
+                            transition: 'height 0.3s ease',
+                          }} />
+                        )
+                      })}
+                    </div>
+                  </div>
                 </div>
-                <div className="mt-1">
-                  <div className="h-1 bg-[#272b34] rounded-full overflow-hidden">
+                {/* Level & XP bar */}
+                <div className="mt-2">
+                  <div className="flex items-center justify-between">
+                    <Badge className="text-[8px] bg-[#9d7cff]/15 text-[#9d7cff] border-0 px-1 py-0">Lv.{Math.floor(store.xp / 100) + 1}</Badge>
+                    <span className="text-[9px] text-muted-foreground">{store.xp % 100}/100 XP</span>
+                  </div>
+                  <div className="h-1 bg-[#272b34] rounded-full overflow-hidden mt-1">
                     <div className="h-full rounded-full" style={{ width: `${(store.xp % 100)}%`, background: 'linear-gradient(to right, #7c9cff, #9d7cff)' }} />
                   </div>
                   <div className="flex items-center justify-between mt-1">
-                    <span className="text-[9px] text-muted-foreground">{store.xp % 100}/100 XP</span>
+                    <span className="text-[9px] text-muted-foreground">{store.dailyMinutesLogged}m today</span>
                     {store.successStreak > 0 && (
                       <span className="text-[9px] text-[#fb923c] flex items-center gap-0.5" style={{ animation: store.successStreak > 0 ? 'pulseDot 1s ease-in-out infinite' : 'none' }}><Flame className="w-2.5 h-2.5" />{store.successStreak}</span>
                     )}
                   </div>
                 </div>
+                {(store.planWeek?.[0]?.focus || store.topic) && (
+                  <p className="text-[9px] text-muted-foreground mt-2 pt-2 border-t border-[#272b34] truncate">
+                    🎯 Today: {store.planWeek?.[0]?.focus || store.topic}
+                  </p>
+                )}
               </div>
-            </div>
-            {(store.planWeek?.[0]?.focus || store.topic) && (
-              <p className="text-[9px] text-muted-foreground mt-2 pt-2 border-t border-[#272b34] truncate">
-                🎯 Today: {store.planWeek?.[0]?.focus || store.topic}
-              </p>
-            )}
-          </div>
+            </TooltipPrimitive.Trigger>
+            <TooltipPrimitive.Content side="right" className="bg-[#191c23] border border-[#272b34] text-xs px-3 py-2 rounded-md z-[200] max-w-[200px]">
+              <p className="font-semibold mb-1">{displayName}</p>
+              <p className="text-[10px] text-muted-foreground">XP: {store.xp} · Level: {Math.floor(store.xp / 100) + 1} · Streak: {store.successStreak}</p>
+              <p className="text-[10px] text-muted-foreground">Daily: {store.dailyMinutesLogged}m / 30m · Tasks: {store.tasks.filter(t => t.status === 'completed').length} done</p>
+              {(() => { const r = getRank(store.xp); return <p className="text-[10px] mt-1" style={{ color: r.color }}>{r.icon} Rank: {r.title}</p> })()}
+            </TooltipPrimitive.Content>
+          </TooltipPrimitive.Root>
           {/* ⌘K hint */}
+          {!store.sidebarCollapsed && (
           <div className="mt-2 px-2">
             <button
               onClick={() => cmdPalette.setOpen(true)}
@@ -5777,11 +6069,27 @@ function MainApp() {
               <span>command palette</span>
             </button>
           </div>
+          )}
           {/* Footer */}
-          <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v12.0 agentic · powered by gemini</p>
+          <div className="mt-2 px-2 pt-2 border-t border-[#272b34] flex items-center justify-between">
+            {!store.sidebarCollapsed && <p className="text-[9px] text-muted-foreground/40">sit with me v13.0 agentic · powered by gemini</p>}
+            {/* Sidebar collapse toggle */}
+            <TooltipPrimitive.Root>
+              <TooltipPrimitive.Trigger asChild>
+                <button
+                  onClick={() => store.setSidebarCollapsed(!store.sidebarCollapsed)}
+                  className="text-muted-foreground/40 hover:text-muted-foreground transition-colors p-1"
+                >
+                  {store.sidebarCollapsed ? <ChevronRight className="w-3 h-3" /> : <ChevronLeft className="w-3 h-3" />}
+                </button>
+              </TooltipPrimitive.Trigger>
+              <TooltipPrimitive.Content side="right" className="bg-[#191c23] border border-[#272b34] text-xs px-2 py-1 rounded-md z-[200]">
+                {store.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} <span className="text-muted-foreground ml-1">[Ctrl+/]</span>
+              </TooltipPrimitive.Content>
+            </TooltipPrimitive.Root>
           </div>
         </div>
+        )}
       </aside>
 
       {/* Main Content */}
@@ -6030,51 +6338,126 @@ export default function Home() {
   const cmdPalette = useCommandPalette()
   const store = useAppStore()
 
-  // Welcome back detection
-  const welcomeName = store.sessionToken && store.userName && store.currentView === 'landing' ? store.userName : ''
+  // Sync theme to document root
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', store.theme || 'dark')
+  }, [store.theme])
+
+  // Welcome back detection - enhanced animated overlay
+  const welcomeName = store.sessionToken && store.userName && store.currentView === 'app' && !store.welcomeDismissed ? store.userName : ''
   const [showWelcome, setShowWelcome] = useState(!!welcomeName)
+  const [typedText, setTypedText] = useState('')
+  const fullWelcomeText = welcomeName ? `Welcome back, ${welcomeName}! Ready to continue learning ${store.topic || 'something new'}?` : ''
 
   useEffect(() => {
-    if (welcomeName) {
-      const timer = setTimeout(() => setShowWelcome(false), 2500)
-      return () => clearTimeout(timer)
+    if (welcomeName && !store.welcomeDismissed) {
+      setShowWelcome(true)
+      // Typing animation
+      let idx = 0
+      const typeInterval = setInterval(() => {
+        if (idx < fullWelcomeText.length) {
+          setTypedText(fullWelcomeText.slice(0, idx + 1))
+          idx++
+        } else {
+          clearInterval(typeInterval)
+        }
+      }, 30)
+      // Auto-dismiss after 4 seconds
+      const timer = setTimeout(() => {
+        setShowWelcome(false)
+        store.setWelcomeDismissed(true)
+      }, 4000)
+      return () => { clearTimeout(timer); clearInterval(typeInterval) }
     }
-  }, [welcomeName])
+  }, [welcomeName, store.welcomeDismissed])
+
+  const dismissWelcome = () => {
+    setShowWelcome(false)
+    store.setWelcomeDismissed(true)
+  }
 
   const viewKey = currentView
+
+  // Rank badge helper
+  const getRank = (xp: number) => {
+    if (xp >= 1000) return { title: 'Master', color: '#ffce6b', icon: '👑' }
+    if (xp >= 500) return { title: 'Expert', color: '#c084fc', icon: '🎓' }
+    if (xp >= 200) return { title: 'Scholar', color: '#7c9cff', icon: '📚' }
+    if (xp >= 50) return { title: 'Apprentice', color: '#5fd0a0', icon: '⚡' }
+    return { title: 'Novice', color: '#9ca3af', icon: '🌱' }
+  }
 
   return (
     <TooltipPrimitive.Provider delayDuration={300}>
       <main className="bg-[#0e0f13] text-[#eef0f4] min-h-screen">
         <GlobalStyles />
-        {/* Welcome Back Overlay */}
+        {/* Enhanced Welcome Back Overlay */}
         <AnimatePresence>
-          {showWelcome && (
+          {showWelcome && welcomeName && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.5 }}
-              className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0e0f13]"
+              className="fixed inset-0 z-[200] flex items-center justify-center bg-[#0e0f13]/95 backdrop-blur-md cursor-pointer"
+              onClick={dismissWelcome}
             >
               <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                exit={{ scale: 1.1, opacity: 0 }}
+                initial={{ scale: 0.8, opacity: 0, y: 20 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 1.05, opacity: 0, y: -10 }}
                 transition={{ duration: 0.6, ease: 'easeOut' }}
-                className="text-center"
+                className="text-center max-w-md mx-4"
+                onClick={e => e.stopPropagation()}
               >
-                <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center text-2xl font-bold"
-                  style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', boxShadow: '0 0 40px rgba(124,156,255,0.4)' }}>
-                  {welcomeName.charAt(0).toUpperCase()}
+                {/* Avatar with glow ring */}
+                <div className="relative w-24 h-24 mx-auto mb-6">
+                  <div className="absolute inset-[-6px] rounded-full animate-pulseGlow" style={{ background: 'conic-gradient(from 0deg, #7c9cff, #9d7cff, #c084fc, #7c9cff)', opacity: 0.5 }} />
+                  <div className="w-24 h-24 rounded-full flex items-center justify-center text-3xl font-bold relative"
+                    style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)', boxShadow: '0 0 40px rgba(124,156,255,0.4)' }}>
+                    {welcomeName.charAt(0).toUpperCase()}
+                  </div>
                 </div>
-                <h2 className="text-3xl font-bold gradient-text mb-2">Welcome back, {welcomeName}!</h2>
-                <p className="text-muted-foreground text-sm">Resuming your learning journey...</p>
-                <div className="mt-4 flex justify-center gap-1">
-                  {[0, 1, 2].map(i => (
-                    <span key={i} className="w-2 h-2 rounded-full bg-[#7c9cff]" style={{ animation: `thinkingDot 1.2s ease-in-out ${i * 0.2}s infinite` }} />
-                  ))}
+                {/* Gradient name */}
+                <h2 className="text-3xl font-bold gradient-text mb-2">{welcomeName}</h2>
+                {/* Typing animation message */}
+                <p className="text-muted-foreground text-sm min-h-[20px]">
+                  {typedText}
+                  <span className="inline-block w-0.5 h-4 bg-[#7c9cff] ml-0.5 align-middle" style={{ animation: 'pulseDot 0.8s ease-in-out infinite' }} />
+                </p>
+                {/* Progress preview */}
+                <div className="flex items-center justify-center gap-4 mt-4">
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-[#7c9cff]">Lv.{Math.floor(store.xp / 100) + 1}</p>
+                    <p className="text-[9px] text-muted-foreground">Level</p>
+                  </div>
+                  <div className="w-px h-8 bg-[#272b34]" />
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-[#9d7cff]">{store.xp}</p>
+                    <p className="text-[9px] text-muted-foreground">XP</p>
+                  </div>
+                  <div className="w-px h-8 bg-[#272b34]" />
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-[#ffce6b]">{store.successStreak}🔥</p>
+                    <p className="text-[9px] text-muted-foreground">Streak</p>
+                  </div>
                 </div>
+                {/* Quick action buttons */}
+                <div className="flex items-center justify-center gap-2 mt-5">
+                  <button onClick={() => { dismissWelcome(); store.setTab('session') }}
+                    className="text-xs bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold px-4 py-2 rounded-lg btn-hover">
+                    Continue Session
+                  </button>
+                  <button onClick={() => { dismissWelcome(); store.setTab('review') }}
+                    className="text-xs bg-[#191c23] border border-[#272b34] text-foreground px-4 py-2 rounded-lg hover:border-[#7c9cff]/40 btn-hover">
+                    Review Flashcards
+                  </button>
+                  <button onClick={() => { dismissWelcome(); store.setTab('progress') }}
+                    className="text-xs bg-[#191c23] border border-[#272b34] text-foreground px-4 py-2 rounded-lg hover:border-[#7c9cff]/40 btn-hover">
+                    View Progress
+                  </button>
+                </div>
+                <p className="text-[10px] text-muted-foreground/40 mt-4">Click anywhere to dismiss</p>
               </motion.div>
             </motion.div>
           )}
