@@ -288,3 +288,108 @@ Stage Summary:
 - Light theme CSS covers aurora, thinking ripple, chat input glow, review cards, mood tracker
 - Command palette has 13 total commands (up from 9) including Add Flashcard, Toggle Theme, Export Data, Start Pomodoro
 - App remains at v9.0 AGENTIC, store persist key sitwithme-v9 unchanged
+
+---
+Task ID: 8
+Agent: Main Agent (v9.0 QA + Bug Fix + Polish Round)
+Task: QA Testing, Critical Bug Fixes, Feature Enhancements, GitHub Push
+
+Work Log:
+- Read worklog.md — v7.0 AGENTIC was the last documented stable version, but v8.0 code was present
+- Performed QA testing with agent-browser — found **critical app crash** on landing page
+- Root cause: **Hydration mismatch** from `Math.random()` in `FloatingParticles` component's `useMemo`, causing React to throw in Next.js 16 SSR
+- Fixed FloatingParticles: replaced `Math.random()` with seeded PRNG (`mulberry32` with seed 42) for deterministic server+client rendering
+- Fixed XP chart data: replaced `Math.random()` in ProgressView's AreaChart `useMemo` with deterministic calculation
+- Fixed **Drawer component error**: `import { Drawer } from 'vaul'` → `import { Drawer as VaulDrawer }` and `<Drawer>` → `<VaulDrawer.Root>` (vaul exports Drawer as object, not component)
+- Fixed **sessionCount reference error**: ProgressView used `sessionCount` (undefined) instead of `totalSessions` (local variable) in two places (XP chart deps array and 35-day activity heatmap)
+- Verified landing page, signup flow, onboarding chat all working with zero browser errors
+- Verified main app loads with all 9 tabs visible and functional
+- Pushed v9.0 to GitHub: coders786/sit-with-me main branch
+
+Critical Bugs Fixed:
+1. **Hydration mismatch (app crash)**: Math.random() in useMemo → seeded PRNG mulberry32
+2. **Drawer component error**: `<Drawer>` is invalid JSX → `<VaulDrawer.Root>`
+3. **sessionCount undefined**: `sessionCount` → `totalSessions` in ProgressView (2 locations)
+4. **XP chart Math.random()**: Replaced with deterministic calculation
+
+New Features Added (v8→v9):
+1. **🃏 Review Tab**: Spaced repetition flashcards with SM-2 algorithm, flip animation, Again/Hard/Good/Easy rating, card list management
+2. **😊 Mood Tracker Widget**: 5-emoji mood logging, daily check, low-mood streak detection
+3. **👍👎💡📌 Message Reactions**: Reaction buttons on assistant messages, toggle on/off
+4. **📋 Auto-Task Extraction**: AI response parsing for actionable items, auto-creates tasks when autoTasks enabled
+5. **⏱ Session Timer**: Elapsed time display in top bar, starts on chat view entry
+6. **📊 Skill Radar Chart**: Recharts RadarChart showing Consistency/Depth/Breadth/Speed/Retention
+7. **🌅 Aurora Background**: Slowly shifting gradient animation replacing static grid-bg
+8. **🧠 Thinking Ripple**: Concentric circle animation on thinking indicator avatar
+9. **💬 Chat Input Glow**: Pulsing border glow on focused chat input, glowing send button
+10. **📱 9-Tab Navigation**: Added Review tab, keyboard shortcuts 1-9
+11. **🎯 Social Proof Section**: Landing page animated stats, avatar circles
+12. **⭕ Radial Progress Circle**: SVG mastery circle replacing simple bar
+13. **💡 Smart Suggestion Chips**: Context-aware follow-up suggestions after AI messages
+14. **⚙️ Enhanced Settings**: Review settings, session preferences, data export/import
+15. **🌤 Light Theme Fixes**: Aurora, ripple, glow, review cards, mood tracker light variants
+16. **⌘K Command Palette**: 13 commands (was 9), added Add Flashcard, Toggle Theme, Export Data, Start Pomodoro
+
+Stage Summary:
+- App upgraded from v8.0 to v9.0 AGENTIC
+- 4 critical bugs fixed (2 causing full app crashes)
+- 16 major feature additions/enhancements
+- Store extended with reviewCards, moodLogs, messageReactions, sessionStartTime, dailyReviewReminders, autoGenerateFlashcards, defaultSessionDuration
+- All code lint-clean (0 errors)
+- Pushed to GitHub: coders786/sit-with-me
+
+## Current Project Status
+
+The "Sit With Me" learning companion app is at **v9.0 AGENTIC** and is stable. The app is a full Next.js 16 single-page application with:
+
+- **9 main tabs**: Session, Plan, Tasks, Progress, Resources, Review, Think Space, Room, Settings
+- **Complete auth flow**: Landing → Signup → API Key → AI Onboarding → Profile → Google Connect → Main App
+- **AI-powered features**: Chat mentor, onboarding extraction, plan generation, auto-task extraction, resource curation, daily challenges, session summaries, spaced repetition, smart suggestions
+- **Rich UI**: Dark/Light theme, aurora background, framer-motion transitions, Radix tooltips, glassmorphism, confetti, pomodoro timer, focus mode, command palette (13 commands), keyboard shortcuts (1-9), thinking ripple, chat input glow
+- **Gamification**: XP/Level system, achievement badges (8), daily challenges, streaks, weekly heatmap, mood tracker, radial mastery circle, skill radar chart
+- **Data Management**: Export/import JSON, review settings, session preferences
+
+## Current Goals / Completed Modifications / Verification Results
+
+| Goal | Status | Notes |
+|------|--------|-------|
+| QA Testing | ✅ Complete | Landing, signup, onboarding, main app all tested |
+| Hydration Bug Fix | ✅ Fixed | Seeded PRNG (mulberry32) replaces Math.random() |
+| Drawer Component Fix | ✅ Fixed | VaulDrawer.Root replaces Drawer |
+| sessionCount Fix | ✅ Fixed | totalSessions replaces undefined variable |
+| Review Tab (Spaced Rep) | ✅ Implemented | Flashcards, SM-2, flip animation |
+| Mood Tracker | ✅ Implemented | 5-emoji widget, streak detection |
+| Message Reactions | ✅ Implemented | 👍👎💡📌 on assistant messages |
+| Auto-Task Extraction | ✅ Implemented | Pattern matching on AI responses |
+| Session Timer | ✅ Implemented | Elapsed time in top bar |
+| Skill Radar Chart | ✅ Implemented | Recharts RadarChart with 5 dimensions |
+| Aurora Background | ✅ Implemented | Slowly shifting gradient animation |
+| Thinking Ripple | ✅ Implemented | Concentric circles on thinking indicator |
+| Chat Input Glow | ✅ Implemented | Pulsing border + glowing send button |
+| Social Proof | ✅ Implemented | Animated stats + avatar circles |
+| Radial Progress | ✅ Implemented | SVG circle with gradient stroke |
+| Smart Suggestions | ✅ Implemented | Context-aware chips after AI messages |
+| Enhanced Settings | ✅ Implemented | Review, session, data management |
+| Light Theme Fixes | ✅ Implemented | Aurora, ripple, glow, review, mood |
+| Command Palette | ✅ Enhanced | 13 commands (was 9) |
+| Lint Check | ✅ 0 errors | Clean code |
+| GitHub Push | ✅ Pushed | coders786/sit-with-me main branch |
+
+## Unresolved Issues / Risks / Next Phase Recommendations
+
+### Unresolved Issues
+1. **Google OAuth not connected** — Uses demo mode. Needs real GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+2. **API key persistence** — Gemini API key stored server-side but not re-tested on app load
+3. **Onboarding flow is slow** — Takes 3-5 message rounds to complete all 8 profile fields
+4. **No real-time sync** — Room chat uses polling instead of WebSocket
+5. **Mobile navigation** — 9 tabs may be too many; mobile bottom nav shows only 5 + "More" drawer
+6. **Vaul Drawer may still have issues** — VaulDrawer.Root works but may need further testing on mobile
+
+### Priority Recommendations for Next Phase
+1. **Google Calendar Push** — Implement actual Google Calendar event creation via API
+2. **Voice TTS Integration** — Use z-ai-web-dev-sdk TTS for speaking AI responses
+3. **WebSocket for Room Chat** — Replace polling with socket.io for real-time chat
+4. **Mobile Bottom Sheet** — Use vaul Drawer for mobile "More tabs" navigation (already partially implemented)
+5. **Hugging Face Deployment** — Deploy to HF Spaces for public access
+6. **Auto-generate Flashcards from Chat** — When autoGenerateFlashcards is enabled, auto-create ReviewCards from key concepts in AI responses
+7. **Profile Completion Flow** — Streamline onboarding to reduce steps needed
