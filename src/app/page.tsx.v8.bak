@@ -26,8 +26,8 @@ import {
 import { toast } from 'sonner'
 import { AnimatePresence, motion } from 'framer-motion'
 import * as TooltipPrimitive from '@radix-ui/react-tooltip'
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
-import { Drawer as VaulDrawer } from 'vaul'
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts'
+import { Drawer } from 'vaul'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
@@ -221,52 +221,11 @@ function GlobalStyles() {
       @keyframes pulseRing { 0% { box-shadow: 0 0 0 0 rgba(124,156,255,0.4); } 70% { box-shadow: 0 0 0 8px rgba(124,156,255,0); } 100% { box-shadow: 0 0 0 0 rgba(124,156,255,0); } }
       @keyframes progressShimmer { 0% { left: -100%; } 100% { left: 200%; } }
       @keyframes cardShine { from { left: -100%; } to { left: 200%; } }
-      @keyframes ripple { 0% { transform: scale(0.8); opacity: 1; } 100% { transform: scale(2.5); opacity: 0; } }
-      @keyframes aurora { 0% { background-position: 0% 50%; } 25% { background-position: 50% 0%; } 50% { background-position: 100% 50%; } 75% { background-position: 50% 100%; } 100% { background-position: 0% 50%; } }
-      @keyframes slideInLeft { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
-      @keyframes pulseGlow { 0%, 100% { box-shadow: 0 0 8px rgba(124,156,255,0.3); } 50% { box-shadow: 0 0 20px rgba(124,156,255,0.6); } }
-      @keyframes borderGlow { 0%, 100% { border-color: rgba(124,156,255,0.3); } 50% { border-color: rgba(124,156,255,0.7); } }
 
       .animate-fadeInUp { animation: fadeInUp 0.5s ease-out forwards; }
       .animate-fadeIn { animation: fadeIn 0.3s ease-out forwards; }
       .animate-slideUp { animation: slideUp 0.35s ease-out forwards; }
       .animate-tabSwitch { animation: tabSwitch 0.25s ease-out forwards; }
-      .animate-slideInLeft { animation: slideInLeft 0.3s ease-out forwards; }
-      .animate-pulseGlow { animation: pulseGlow 2s ease-in-out infinite; }
-      .animate-borderGlow { animation: borderGlow 2s ease-in-out infinite; }
-
-      /* Aurora background */
-      .aurora-bg {
-        background: linear-gradient(135deg, #0e0f13, #111318, #0f1117, #10121a);
-        background-size: 400% 400%;
-        animation: aurora 15s ease infinite;
-      }
-
-      /* Chat input glow on focus */
-      .chat-input-glow:focus-within {
-        animation: borderGlow 2s ease-in-out infinite;
-        box-shadow: 0 0 12px rgba(124,156,255,0.15);
-      }
-
-      /* Thinking ripple effect */
-      .thinking-ripple {
-        position: relative;
-      }
-      .thinking-ripple::before, .thinking-ripple::after {
-        content: '';
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        border: 1px solid rgba(157,124,255,0.3);
-        transform: translate(-50%, -50%);
-        animation: ripple 2s ease-out infinite;
-      }
-      .thinking-ripple::after {
-        animation-delay: 0.5s;
-      }
 
       .chat-bubble-enter { animation: slideUp 0.3s ease-out forwards; }
 
@@ -538,7 +497,7 @@ function CommandPalette({ open, onClose }: { open: boolean; onClose: () => void 
     { id: 'thinkspace', label: 'Think Space', icon: <Sparkles className="w-4 h-4" />, desc: 'Deploy sub-agents', action: () => { store.setTab('thinkspace'); onClose() } },
     { id: 'settings', label: 'Settings', icon: <Settings className="w-4 h-4" />, desc: 'Configure preferences', action: () => { store.setTab('settings'); onClose() } },
     { id: 'toggle-voice', label: 'Toggle Voice', icon: <Volume2 className="w-4 h-4" />, desc: 'Enable/disable voice', action: () => { store.setSettings({ voiceEnabled: !store.voiceEnabled }); toast.success(store.voiceEnabled ? 'Voice off' : 'Voice on'); onClose() } },
-    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v9'); window.location.reload() } },
+    { id: 'reset', label: 'Reset Everything', icon: <RotateCcw className="w-4 h-4" />, desc: 'Clear all data', action: () => { localStorage.removeItem('sitwithme-v8'); window.location.reload() } },
   ], [store, onClose])
 
   const filtered = useMemo(() =>
@@ -660,7 +619,7 @@ function KeyboardShortcutsModal({ open, onClose }: { open: boolean; onClose: () 
   const shortcuts = [
     { keys: '⌘K', desc: 'Command Palette' },
     { keys: '⌘Enter', desc: 'Send message' },
-    { keys: '1-9', desc: 'Switch tabs' },
+    { keys: '1-8', desc: 'Switch tabs' },
     { keys: '⇧⌘F', desc: 'Focus Mode' },
     { keys: '?', desc: 'Show shortcuts' },
     { keys: 'Esc', desc: 'Close modal/palette' },
@@ -708,11 +667,11 @@ function useKeyboardShortcuts() {
         e.preventDefault()
         setOpen(v => !v)
       }
-      // Number keys 1-9 for tab switching (only when not in input)
-      if (/^[1-9]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      // Number keys 1-8 for tab switching (only when not in input)
+      if (/^[1-8]$/.test(e.key) && !e.metaKey && !e.ctrlKey && !e.altKey) {
         const target = e.target as HTMLElement
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
-        const tabs: AppTab[] = ['session', 'plan', 'tasks', 'progress', 'resources', 'review', 'thinkspace', 'room', 'settings']
+        const tabs: AppTab[] = ['session', 'plan', 'tasks', 'progress', 'resources', 'thinkspace', 'room', 'settings']
         if (store.currentView === 'app') {
           store.setTab(tabs[parseInt(e.key) - 1])
         }
@@ -818,7 +777,7 @@ function AgentTracePanel({ visible }: { visible: boolean }) {
 function ThinkingIndicator() {
   return (
     <div className="flex gap-3 chat-bubble-enter">
-      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0 thinking-ripple"
+      <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm shrink-0"
         style={{ background: 'linear-gradient(135deg, #7c9cff, #9d7cff)' }}>
         🧠
       </div>
@@ -1172,10 +1131,10 @@ function LandingScreen() {
   const features = [
     { emoji: '🧠', title: 'Agentic AI Mentor', desc: 'Socratic dialogue that adapts to how you think' },
     { emoji: '📋', title: 'Auto-Task Extraction', desc: 'AI reads your chat and creates learning tasks' },
-    { emoji: '🃏', title: 'Spaced Repetition', desc: 'Flashcards that adapt to your memory' },
     { emoji: '📅', title: 'Smart Scheduling', desc: '7-day plans pushed to Google Calendar' },
-    { emoji: '😊', title: 'Mood Tracking', desc: 'Track how you feel — your mentor notices' },
-    { emoji: '🌱', title: 'Progress Tracking', desc: 'XP, streaks, radar charts — not percentages' },
+    { emoji: '📧', title: 'Email Nudges', desc: 'Morning reminders from your AI mentor' },
+    { emoji: '🌱', title: 'Progress Tracking', desc: 'XP, streaks, and mastery — not percentages' },
+    { emoji: '🖥', title: 'Screen Vision + Voice', desc: 'See your screen, speak responses aloud' },
   ]
 
   const stats = [
@@ -1199,7 +1158,7 @@ function LandingScreen() {
           <Orb />
         </div>
         <Badge className="mb-4 bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-bold text-xs px-4 py-1">
-          v9.0 AGENTIC
+          v8.0 AGENTIC
         </Badge>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight mb-4 bg-clip-text text-transparent bg-gradient-to-r from-[#7c9cff] via-[#9d7cff] to-[#c084fc]"
           style={{ backgroundSize: '200% 200%', animation: 'shimmer-gradient 4s ease infinite' }}>
@@ -1818,7 +1777,7 @@ function DailyCheckinWidget() {
 }
 
 /* ========================================================================
-   DAILY CHALLENGE WIDGET
+   DAILY CHALLENGE WIDGET (v8.0)
    ======================================================================== */
 function DailyChallengeWidget() {
   const store = useAppStore()
@@ -1899,7 +1858,7 @@ function DailyChallengeWidget() {
 }
 
 /* ========================================================================
-   SESSION SUMMARY MODAL
+   SESSION SUMMARY MODAL (v8.0)
    ======================================================================== */
 function SessionSummaryModal({ open, onClose, summary, keyPoints, xp }: {
   open: boolean; onClose: () => void; summary: string; keyPoints: string[]; xp: number
@@ -1991,7 +1950,7 @@ function ChatSessionView() {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight
   }, [store.chatMessages, store.chatBusy])
 
-  // Initial greeting + session start time
+  // Initial greeting
   useEffect(() => {
     if (store.chatMessages.length === 0) {
       store.addChatMessage({
@@ -1999,9 +1958,6 @@ function ChatSessionView() {
         content: `welcome${store.userName ? ', ' + store.userName : ''}. your goal: ${store.vision || store.topic || 'learning'}.\n\nlet's start with one small thing. what part of this feels most confusing right now?`,
         timestamp: Date.now(),
       })
-    }
-    if (!store.sessionStartTime) {
-      store.setSessionStartTime(Date.now())
     }
   }, [])
 
@@ -2023,24 +1979,6 @@ function ChatSessionView() {
         boost: isComplex,
       })
       store.addChatMessage({ role: 'assistant', content: data.reply, timestamp: Date.now() })
-
-      // Auto-task extraction from AI responses
-      if (store.autoTasks) {
-        const actionPatterns = /(?:you should|try to|make sure to|practice|build a|create a|work on|focus on|start by|remember to|don't forget to|it's important to)\s+(.{10,80})/gi
-        const extractedTasks = [...data.reply.matchAll(actionPatterns)].map(m => m[1].trim().replace(/[.!]+$/, ''))
-        if (extractedTasks.length > 0) {
-          extractedTasks.slice(0, 3).forEach(taskTitle => {
-            store.addTask({
-              id: Date.now().toString() + Math.random().toString(36).slice(2),
-              title: taskTitle,
-              status: 'pending',
-              source: 'ai-extracted',
-              priority: 'medium',
-            })
-          })
-          store.addNotification(`📋 ${extractedTasks.length} task${extractedTasks.length > 1 ? 's' : ''} extracted from conversation`)
-        }
-      }
 
       if (data.actions?.includes('suggest-task')) {
         store.addChatMessage({
@@ -2167,8 +2105,6 @@ function ChatSessionView() {
 
       {/* Messages */}
       <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-3 max-w-3xl mx-auto w-full custom-scrollbar">
-        {/* Mood Tracker Widget */}
-        <MoodTrackerWidget />
         {/* Daily Check-in Widget */}
         <DailyCheckinWidget />
         {/* Daily Challenge Widget */}
@@ -2220,22 +2156,9 @@ function ChatSessionView() {
                 <div className={`text-[9px] text-muted-foreground/50 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
                   {timeAgo(msg.timestamp)}
                 </div>
-                {/* Copy & Bookmark & Reaction buttons on assistant messages */}
+                {/* Copy & Bookmark buttons on assistant messages */}
                 {msg.role === 'assistant' && (
                   <div className="absolute -bottom-1 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                    {/* Message Reactions */}
-                    {(['👍', '👎', '💡', '📌'] as const).map(reaction => {
-                      const isActive = store.messageReactions.some(r => r.messageId === `msg-${i}` && r.reaction === reaction)
-                      return (
-                        <button
-                          key={reaction}
-                          onClick={() => store.addMessageReaction(`msg-${i}`, reaction)}
-                          className={`bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1 py-0.5 text-[10px] transition-colors ${isActive ? 'ring-1 ring-[#7c9cff]/50' : ''}`}
-                        >
-                          {reaction}
-                        </button>
-                      )
-                    })}
                     <button
                       onClick={() => copyToClipboard(msg.content, i)}
                       className="bg-[#272b34] hover:bg-[#3a3f4b] rounded px-1.5 py-0.5 text-[10px] text-muted-foreground flex items-center gap-1"
@@ -2267,17 +2190,17 @@ function ChatSessionView() {
       {/* Composer */}
       <div className="border-t border-[#272b34] p-4">
         <div className="max-w-3xl mx-auto">
-          <div className="flex gap-2 chat-input-glow rounded-lg">
+          <div className="flex gap-2">
             <Textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               placeholder="type or use the mic..."
-              className="flex-1 bg-[#191c23] border-[#272b34] text-foreground focus:border-[#7c9cff] resize-none min-h-[48px] transition-all"
+              className="flex-1 bg-[#191c23] border-[#272b34] text-foreground focus:border-[#7c9cff] resize-none min-h-[48px]"
               rows={1}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
             />
             <Button onClick={send} disabled={store.chatBusy} data-send-btn
-              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] px-4 shrink-0 btn-hover animate-pulseGlow">
+              className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] px-4 shrink-0 btn-hover">
               <Send className="w-4 h-4" />
             </Button>
           </div>
@@ -2889,27 +2812,6 @@ function ProgressView() {
         <AnimatedNumber value={`${mastery}%`} label="mastery" color="text-[#9d7cff]" icon={Star} />
       </div>
 
-      {/* Skill Radar Chart */}
-      <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
-        <CardContent className="p-4">
-          <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">Skill Profile</p>
-          <ResponsiveContainer width="100%" height={220}>
-            <RadarChart data={useMemo(() => [
-              { skill: 'Consistency', value: Math.min(100, streak * 15 + 20), fullMark: 100 },
-              { skill: 'Depth', value: Math.min(100, wins * 10 + 15), fullMark: 100 },
-              { skill: 'Breadth', value: Math.min(100, store.tasks.length * 8 + 10), fullMark: 100 },
-              { skill: 'Speed', value: Math.min(100, totalSessions * 5 + 25), fullMark: 100 },
-              { skill: 'Retention', value: Math.min(100, Math.round(mastery * 0.8 + store.reviewCards.length * 5)), fullMark: 100 },
-            ], [streak, wins, store.tasks.length, totalSessions, mastery, store.reviewCards.length])}>
-              <PolarGrid stroke="rgba(255,255,255,0.06)" />
-              <PolarAngleAxis dataKey="skill" tick={{ fontSize: 10, fill: '#6b7280' }} />
-              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
-              <Radar name="Skills" dataKey="value" stroke="#7c9cff" fill="#7c9cff" fillOpacity={0.15} strokeWidth={2} />
-            </RadarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
-
       {/* XP / Level Card */}
       <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover">
         <CardContent className="p-4">
@@ -3071,35 +2973,6 @@ function ProgressView() {
         </CardContent>
       </Card>
 
-      {/* Mood History */}
-      {store.moodLogs.length > 0 && (
-        <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">Mood History (Last 7 Days)</p>
-            <div className="flex items-end gap-2 h-16">
-              {store.moodLogs.slice(-7).map((log, i) => {
-                const moods = ['', '😫', '😐', '🙂', '😊', '🤩']
-                const colors = ['', '#ff8a8a', '#ffce6b', '#c5d0ff', '#7c9cff', '#5fd0a0']
-                return (
-                  <div key={log.id} className="flex flex-col items-center gap-1 flex-1">
-                    <div className="w-full rounded-t" style={{
-                      height: `${log.mood * 16}%`,
-                      background: colors[log.mood],
-                      opacity: 0.7,
-                      minHeight: '8px',
-                    }} />
-                    <span className="text-xs">{moods[log.mood]}</span>
-                    <span className="text-[8px] text-muted-foreground/50">
-                      {i === store.moodLogs.slice(-7).length - 1 ? 'Today' : `${7 - i}d`}
-                    </span>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Session History */}
       <Card className="bg-[#191c23] border-[#272b34] mb-4 card-hover card-shine">
         <CardContent className="p-4">
@@ -3156,7 +3029,7 @@ function ProgressView() {
 }
 
 /* ========================================================================
-   LEARNING RESOURCES VIEW
+   LEARNING RESOURCES VIEW (v8.0)
    ======================================================================== */
 function ResourcesView() {
   const store = useAppStore()
@@ -3274,256 +3147,6 @@ function ResourcesView() {
             </Card>
           ))}
         </div>
-      )}
-    </div>
-  )
-}
-
-/* ========================================================================
-   MOOD TRACKER WIDGET
-   ======================================================================== */
-function MoodTrackerWidget() {
-  const store = useAppStore()
-  const [selectedMood, setSelectedMood] = useState<number | null>(null)
-  const moods = [
-    { value: 1, emoji: '😫', label: 'Struggling', color: '#ff8a8a' },
-    { value: 2, emoji: '😐', label: 'Meh', color: '#ffce6b' },
-    { value: 3, emoji: '🙂', label: 'Okay', color: '#c5d0ff' },
-    { value: 4, emoji: '😊', label: 'Good', color: '#7c9cff' },
-    { value: 5, emoji: '🤩', label: 'Great', color: '#5fd0a0' },
-  ]
-
-  // Check if already logged mood today
-  const today = new Date().toDateString()
-  const alreadyLogged = store.moodLogs.some(m => new Date(m.timestamp).toDateString() === today)
-
-  const handleMood = (value: number) => {
-    if (alreadyLogged) return
-    setSelectedMood(value)
-    store.addMoodLog(value)
-    store.addNotification(`${moods[value - 1].emoji} Mood logged! Keep tracking your progress.`)
-    // Check for low mood streak
-    const recentMoods = store.moodLogs.slice(-3)
-    if (recentMoods.length >= 2 && recentMoods.every(m => m.mood <= 2)) {
-      store.addNotification('💛 Noticed you\'re having a tough time. Remember, it\'s okay to take a break.')
-    }
-  }
-
-  if (alreadyLogged && selectedMood === null) {
-    const lastMood = store.moodLogs[store.moodLogs.length - 1]
-    if (!lastMood) return null
-    return (
-      <div className="flex items-center gap-2 px-4 py-2 mb-2 max-w-3xl mx-auto w-full">
-        <div className="flex items-center gap-2 bg-[#191c23]/60 border border-[#272b34] rounded-full px-3 py-1.5 text-xs text-muted-foreground">
-          <span>{moods[lastMood.mood - 1].emoji}</span>
-          <span>Today's mood logged</span>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="px-4 py-2 mb-2 max-w-3xl mx-auto w-full">
-      <div className="bg-[#191c23]/60 border border-[#272b34] rounded-xl p-3 card-hover">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-muted-foreground">How are you feeling today?</span>
-          {selectedMood !== null && <span className="text-[10px] text-[#5fd0a0]">✓ Logged</span>}
-        </div>
-        <div className="flex items-center gap-2">
-          {moods.map(m => (
-            <button
-              key={m.value}
-              onClick={() => handleMood(m.value)}
-              disabled={alreadyLogged}
-              className={`flex flex-col items-center gap-0.5 flex-1 py-1.5 rounded-lg transition-all text-sm
-                ${selectedMood === m.value ? 'scale-110 ring-2' : 'hover:scale-105'}
-                ${alreadyLogged ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-              `}
-              style={{
-                ringColor: selectedMood === m.value ? m.color : 'transparent',
-                background: selectedMood === m.value ? `${m.color}15` : 'transparent',
-              }}
-            >
-              <span className="text-lg">{m.emoji}</span>
-              <span className="text-[9px] text-muted-foreground">{m.label}</span>
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-/* ========================================================================
-   REVIEW VIEW (Spaced Repetition)
-   ======================================================================== */
-function ReviewView() {
-  const store = useAppStore()
-  const [flipped, setFlipped] = useState(false)
-  const [currentIdx, setCurrentIdx] = useState(0)
-
-  const dueCards = store.reviewCards.filter(c => c.nextReview <= Date.now())
-  const hasCards = dueCards.length > 0
-  const allCards = store.reviewCards
-
-  const currentCard = hasCards ? dueCards[currentIdx % dueCards.length] : null
-
-  // SM-2 simplified algorithm
-  const rateCard = (quality: number) => {
-    if (!currentCard) return
-    const { easeFactor, interval, repetitions } = currentCard
-    let newEf = easeFactor
-    let newRep = repetitions
-    let newInterval = interval
-
-    if (quality >= 3) {
-      if (repetitions === 0) newInterval = 1
-      else if (repetitions === 1) newInterval = 6
-      else newInterval = Math.round(interval * easeFactor)
-      newRep = repetitions + 1
-    } else {
-      newRep = 0
-      newInterval = 1
-    }
-
-    newEf = Math.max(1.3, easeFactor + (0.1 - (5 - quality) * (0.08 + (5 - quality) * 0.02)))
-
-    store.updateReviewCard(currentCard.id, {
-      easeFactor: newEf,
-      interval: newInterval,
-      repetitions: newRep,
-      nextReview: Date.now() + newInterval * 24 * 60 * 60 * 1000,
-    })
-
-    setFlipped(false)
-    setCurrentIdx(i => i + 1)
-    store.setProgress({ xp: store.xp + 3 })
-    store.addNotification(`🃏 Card reviewed! +3 XP`)
-  }
-
-  const addSampleCards = () => {
-    const topic = store.topic || 'learning'
-    const samples = [
-      { front: `What is the core concept of ${topic}?`, back: 'The fundamental principle that underpins understanding of this topic.', interval: 1, nextReview: Date.now(), easeFactor: 2.5, repetitions: 0 },
-      { front: `Why is ${topic} important?`, back: 'It enables practical application and deeper understanding of related concepts.', interval: 1, nextReview: Date.now(), easeFactor: 2.5, repetitions: 0 },
-      { front: `How would you explain ${topic} to a beginner?`, back: 'Start with the basics, use analogies, and build up complexity gradually.', interval: 1, nextReview: Date.now(), easeFactor: 2.5, repetitions: 0 },
-    ]
-    samples.forEach(s => {
-      store.addReviewCard({ id: Date.now().toString() + Math.random().toString(36).slice(2), ...s })
-    })
-    store.addNotification('🃏 3 flashcards added!')
-  }
-
-  return (
-    <div className="p-4 sm:p-6 max-w-3xl mx-auto animate-tabSwitch">
-      <div className="flex items-center justify-between mb-1">
-        <h2 className="text-2xl font-bold">review</h2>
-        <Badge className="bg-[#7c9cff]/15 text-[#7c9cff] border-0">
-          {dueCards.length} due · {allCards.length} total
-        </Badge>
-      </div>
-      <p className="text-muted-foreground text-sm mb-6">spaced repetition. come back stronger each time.</p>
-
-      {hasCards ? (
-        <div className="space-y-4">
-          {/* Flashcard */}
-          <div
-            className="relative cursor-pointer perspective-1000"
-            onClick={() => setFlipped(!flipped)}
-            style={{ perspective: '1000px' }}
-          >
-            <div className="relative w-full min-h-[240px] transition-transform duration-500"
-              style={{ transformStyle: 'preserve-3d', transform: flipped ? 'rotateY(180deg)' : 'rotateY(0deg)' }}>
-              {/* Front */}
-              <div className="absolute inset-0 backface-hidden" style={{ backfaceVisibility: 'hidden' }}>
-                <Card className="bg-[#191c23] border-[#272b34] h-full card-hover card-shine gradient-border-animated">
-                  <CardContent className="p-8 flex flex-col items-center justify-center min-h-[240px]">
-                    <span className="text-[10px] text-muted-foreground uppercase tracking-widest mb-4">Question</span>
-                    <p className="text-lg text-center font-medium">{currentCard!.front}</p>
-                    <p className="text-xs text-muted-foreground mt-6">tap to reveal answer</p>
-                  </CardContent>
-                </Card>
-              </div>
-              {/* Back */}
-              <div className="absolute inset-0" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}>
-                <Card className="bg-[#191c23] border-[#7c9cff]/30 h-full">
-                  <CardContent className="p-8 flex flex-col items-center justify-center min-h-[240px]">
-                    <span className="text-[10px] text-[#7c9cff] uppercase tracking-widest mb-4">Answer</span>
-                    <p className="text-base text-center">{currentCard!.back}</p>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-
-          {/* Rating Buttons */}
-          {flipped && (
-            <div className="grid grid-cols-4 gap-2 animate-slideUp">
-              <button onClick={() => rateCard(1)} className="py-3 rounded-xl bg-[#ff8a8a]/10 border border-[#ff8a8a]/20 text-[#ff8a8a] text-xs font-semibold hover:bg-[#ff8a8a]/20 transition-colors btn-hover">
-                😫 Again
-              </button>
-              <button onClick={() => rateCard(2)} className="py-3 rounded-xl bg-[#ffce6b]/10 border border-[#ffce6b]/20 text-[#ffce6b] text-xs font-semibold hover:bg-[#ffce6b]/20 transition-colors btn-hover">
-                😐 Hard
-              </button>
-              <button onClick={() => rateCard(3)} className="py-3 rounded-xl bg-[#7c9cff]/10 border border-[#7c9cff]/20 text-[#7c9cff] text-xs font-semibold hover:bg-[#7c9cff]/20 transition-colors btn-hover">
-                🙂 Good
-              </button>
-              <button onClick={() => rateCard(4)} className="py-3 rounded-xl bg-[#5fd0a0]/10 border border-[#5fd0a0]/20 text-[#5fd0a0] text-xs font-semibold hover:bg-[#5fd0a0]/20 transition-colors btn-hover">
-                😊 Easy
-              </button>
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="text-center py-16">
-          <div className="w-20 h-20 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, rgba(124,156,255,0.1), rgba(157,124,255,0.1))' }}>
-            <span className="text-4xl">🃏</span>
-          </div>
-          <h3 className="text-lg font-semibold mb-2">No cards to review</h3>
-          <p className="text-sm text-muted-foreground mb-6 max-w-sm mx-auto">
-            {allCards.length === 0
-              ? 'Create flashcards to start your spaced repetition practice.'
-              : 'All cards are reviewed! Come back when they\'re due.'}
-          </p>
-          {allCards.length === 0 && (
-            <Button onClick={addSampleCards} className="bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] btn-hover">
-              <Plus className="w-4 h-4 mr-2" /> Add Sample Cards
-            </Button>
-          )}
-        </div>
-      )}
-
-      {/* Card List */}
-      {allCards.length > 0 && (
-        <Card className="bg-[#191c23] border-[#272b34] mt-6 card-hover">
-          <CardContent className="p-4">
-            <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-3">All Cards ({allCards.length})</p>
-            <div className="space-y-2 max-h-64 overflow-y-auto custom-scrollbar">
-              {allCards.map(card => {
-                const isDue = card.nextReview <= Date.now()
-                return (
-                  <div key={card.id} className="flex items-center justify-between bg-[#15171d] rounded-lg p-2.5 border border-[#272b34]/50">
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs truncate">{card.front}</p>
-                      <p className="text-[10px] text-muted-foreground mt-0.5">
-                        Rep: {card.repetitions} · EF: {card.easeFactor.toFixed(1)} · {isDue ? 'Due now' : `Due ${timeAgo(card.nextReview)}`}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-1 ml-2">
-                      {isDue && <span className="w-2 h-2 rounded-full bg-[#ff8a8a]" />}
-                      <button onClick={() => store.removeReviewCard(card.id)} className="text-muted-foreground hover:text-[#ff8a8a] transition-colors">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-            <Button size="sm" variant="outline" onClick={addSampleCards} className="mt-3 text-xs border-[#7c9cff]/30 text-[#7c9cff] hover:bg-[#7c9cff]/10 btn-hover">
-              <Plus className="w-3 h-3 mr-1" /> Add More Cards
-            </Button>
-          </CardContent>
-        </Card>
       )}
     </div>
   )
@@ -3766,7 +3389,7 @@ function SettingsView() {
   }
 
   const handleReset = () => {
-    localStorage.removeItem('sitwithme-v9')
+    localStorage.removeItem('sitwithme-v8')
     window.location.reload()
   }
 
@@ -3859,7 +3482,7 @@ function SettingsView() {
 
           <Separator className="bg-[#272b34]" />
 
-          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 9.0 agentic</div>
+          <div className="text-xs text-muted-foreground">⌘K = command palette · ? = shortcuts · version 7.0 agentic</div>
 
           <div className="flex gap-3">
             <Button variant="ghost" onClick={handleSignOut} className="text-muted-foreground btn-hover">
@@ -3952,7 +3575,6 @@ function MainApp() {
     { id: 'tasks', icon: <CheckSquare className="w-[18px]" />, label: 'Tasks' },
     { id: 'progress', icon: <TrendingUp className="w-[18px]" />, label: 'Progress' },
     { id: 'resources', icon: <BookOpen className="w-[18px]" />, label: 'Resources' },
-    { id: 'review', icon: <Clipboard className="w-[18px]" />, label: 'Review' },
     { id: 'thinkspace', icon: <Sparkles className="w-[18px]" />, label: 'Think' },
     { id: 'room', icon: <Globe className="w-[18px]" />, label: 'Room' },
     { id: 'settings', icon: <Settings className="w-[18px]" />, label: 'Settings' },
@@ -3965,7 +3587,6 @@ function MainApp() {
       case 'tasks': return <TasksView />
       case 'progress': return <ProgressView />
       case 'resources': return <ResourcesView />
-      case 'review': return <ReviewView />
       case 'thinkspace': return <ThinkSpaceView />
       case 'room': return <RoomView />
       case 'settings': return <SettingsView />
@@ -3977,7 +3598,7 @@ function MainApp() {
   const avatarInitial = displayName.charAt(0).toUpperCase()
 
   return (
-    <div className="h-screen flex bg-[#0e0f13] text-[#eef0f4] aurora-bg" data-theme={store.theme}>
+    <div className="h-screen flex bg-[#0e0f13] text-[#eef0f4] grid-bg" data-theme={store.theme}>
       {/* Command Palette */}
       <CommandPalette key={`cp-${cmdPalette.openCount}`} open={cmdPalette.open} onClose={cmdPalette.close} />
 
@@ -4010,7 +3631,7 @@ function MainApp() {
                   onClick={() => store.setTab(item.id)}
                   className={`flex items-center gap-3 w-full text-left rounded-lg text-sm transition-all ${
                     store.currentTab === item.id
-                      ? 'sidebar-active text-foreground animate-slideInLeft'
+                      ? 'sidebar-active text-foreground'
                       : 'sidebar-inactive text-muted-foreground hover:bg-[#191c23] hover:text-foreground'
                   }`}
                 >
@@ -4047,7 +3668,7 @@ function MainApp() {
                   <div className="flex items-center justify-between mt-1">
                     <span className="text-[9px] text-muted-foreground">{store.xp % 100}/100 XP</span>
                     {store.successStreak > 0 && (
-                      <span className="text-[9px] text-[#fb923c] flex items-center gap-0.5" style={{ animation: store.successStreak > 0 ? 'pulseDot 1s ease-in-out infinite' : 'none' }}><Flame className="w-2.5 h-2.5" />{store.successStreak}</span>
+                      <span className="text-[9px] text-[#fb923c] flex items-center gap-0.5"><Flame className="w-2.5 h-2.5" />{store.successStreak}</span>
                     )}
                   </div>
                 </div>
@@ -4071,7 +3692,7 @@ function MainApp() {
           </div>
           {/* Footer */}
           <div className="mt-2 px-2 pt-2 border-t border-[#272b34]">
-            <p className="text-[9px] text-muted-foreground/40">sit with me v9.0 agentic · powered by gemini</p>
+            <p className="text-[9px] text-muted-foreground/40">sit with me v8.0 agentic · powered by gemini</p>
           </div>
         </div>
       </aside>
@@ -4079,19 +3700,12 @@ function MainApp() {
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <div className="h-14 border-b border-[#272b34] flex items-center gap-3 px-4 shrink-0 glass" style={{ background: 'rgba(14,15,19,0.8)', backdropFilter: 'blur(20px)' }}>
+        <div className="h-14 border-b border-[#272b34] flex items-center gap-3 px-4 shrink-0">
           <Button variant="ghost" size="sm" className="sm:hidden btn-hover"
             onClick={() => store.toggleSidebar()}>
             <Menu className="w-5 h-5" />
           </Button>
           <span className="font-semibold text-sm capitalize">{store.currentTab === 'thinkspace' ? 'think space' : store.currentTab}</span>
-          {/* Session Timer */}
-          {store.sessionStartTime && (
-            <span className="text-[11px] text-muted-foreground/60 flex items-center gap-1">
-              <Clock className="w-3 h-3" />
-              {Math.floor((Date.now() - store.sessionStartTime) / 60000)}m
-            </span>
-          )}
           <div className="flex-1" />
           {store.calendarConnected && (
             <Badge variant="secondary" className="text-[10px] gap-1">
@@ -4198,9 +3812,9 @@ function MainApp() {
       </div>
 
       {/* Mobile Drawer (vaul) */}
-      <VaulDrawer.Root open={mobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)} onOpenChange={setMobileDrawerOpen}>
-        <VaulDrawer.Overlay className="fixed inset-0 bg-black/50 z-[70]" />
-        <VaulDrawer.Content className="fixed bottom-0 left-0 right-0 z-[80] rounded-t-xl glass max-h-[70vh] overflow-y-auto custom-scrollbar">
+      <Drawer open={mobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)} onOpenChange={setMobileDrawerOpen}>
+        <Drawer.Overlay className="fixed inset-0 bg-black/50 z-[70]" />
+        <Drawer.Content className="fixed bottom-0 left-0 right-0 z-[80] rounded-t-xl glass max-h-[70vh] overflow-y-auto custom-scrollbar">
           <div className="mx-auto w-12 h-1.5 rounded-full bg-muted-foreground/30 mt-3 mb-2" />
           {/* User Profile Card */}
           <div className="px-4 pb-3">
@@ -4256,8 +3870,8 @@ function MainApp() {
               Sign Out
             </button>
           </div>
-        </VaulDrawer.Content>
-      </VaulDrawer.Root>
+        </Drawer.Content>
+      </Drawer>
 
       {/* Quick Notes Panel */}
       <QuickNotesPanel open={quickNotesOpen} onClose={() => setQuickNotesOpen(false)} />

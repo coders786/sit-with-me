@@ -4,7 +4,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 export type AppView = 'landing' | 'apikey' | 'onboarding' | 'profile' | 'googleconnect' | 'app'
-export type AppTab = 'session' | 'plan' | 'tasks' | 'progress' | 'resources' | 'room' | 'settings' | 'thinkspace'
+export type AppTab = 'session' | 'plan' | 'tasks' | 'progress' | 'resources' | 'review' | 'room' | 'settings' | 'thinkspace'
 
 export interface ChatMsg {
   role: 'user' | 'assistant' | 'system'
@@ -81,6 +81,27 @@ export interface DailyChallenge {
   description: string
   xpReward: number
   completed: boolean
+}
+
+export interface ReviewCard {
+  id: string
+  front: string
+  back: string
+  interval: number
+  nextReview: number
+  easeFactor: number
+  repetitions: number
+}
+
+export interface MoodLog {
+  id: string
+  mood: number // 1-5
+  timestamp: number
+}
+
+export interface MessageReaction {
+  messageId: string
+  reaction: '👍' | '👎' | '💡' | '📌'
 }
 
 interface AppState {
@@ -191,6 +212,24 @@ interface AppState {
   // Quick Notes
   quickNotes: string
   setQuickNotes: (notes: string) => void
+
+  // Review Cards (Spaced Repetition)
+  reviewCards: ReviewCard[]
+  addReviewCard: (card: ReviewCard) => void
+  updateReviewCard: (id: string, updates: Partial<ReviewCard>) => void
+  removeReviewCard: (id: string) => void
+
+  // Mood Tracker
+  moodLogs: MoodLog[]
+  addMoodLog: (mood: number) => void
+
+  // Message Reactions
+  messageReactions: MessageReaction[]
+  addMessageReaction: (messageId: string, reaction: MessageReaction['reaction']) => void
+
+  // Session Timer
+  sessionStartTime: number | null
+  setSessionStartTime: (time: number | null) => void
 
   // Actions
   setView: (view: AppView) => void
@@ -368,6 +407,37 @@ export const useAppStore = create<AppState>()(
       quickNotes: '',
       setQuickNotes: (notes) => set({ quickNotes: notes }),
 
+      // Review Cards
+      reviewCards: [],
+      addReviewCard: (card) => set((s) => ({
+        reviewCards: [...s.reviewCards, card],
+      })),
+      updateReviewCard: (id, updates) => set((s) => ({
+        reviewCards: s.reviewCards.map(c => c.id === id ? { ...c, ...updates } : c),
+      })),
+      removeReviewCard: (id) => set((s) => ({
+        reviewCards: s.reviewCards.filter(c => c.id !== id),
+      })),
+
+      // Mood Tracker
+      moodLogs: [],
+      addMoodLog: (mood) => set((s) => ({
+        moodLogs: [...s.moodLogs, { id: Date.now().toString() + Math.random().toString(36).slice(2), mood, timestamp: Date.now() }].slice(-100),
+      })),
+
+      // Message Reactions
+      messageReactions: [],
+      addMessageReaction: (messageId, reaction) => set((s) => ({
+        messageReactions: [
+          ...s.messageReactions.filter(r => !(r.messageId === messageId && r.reaction === reaction)),
+          { messageId, reaction },
+        ].slice(-200),
+      })),
+
+      // Session Timer
+      sessionStartTime: null,
+      setSessionStartTime: (time) => set({ sessionStartTime: time }),
+
       // Actions
       setView: (view) => set({ currentView: view }),
       setTab: (tab) => set({ currentTab: tab }),
@@ -396,6 +466,8 @@ export const useAppStore = create<AppState>()(
         learningResources: [], bookmarkedMessages: [], focusMode: false,
         confettiActive: false, currentView: 'landing',
         sessionSummaries: [], dailyChallenge: null, quickNotes: '',
+        reviewCards: [], moodLogs: [], messageReactions: [],
+        sessionStartTime: null,
       }),
 
       setLearningProfile: (data) => set((s) => ({ ...s, ...data })),
@@ -466,7 +538,7 @@ export const useAppStore = create<AppState>()(
       setTaskFilter: (filter) => set({ taskFilter: filter }),
     }),
     {
-      name: 'sitwithme-v8',
+      name: 'sitwithme-v9',
       partialize: (state) => ({
         sessionToken: state.sessionToken,
         userId: state.userId,
@@ -514,6 +586,10 @@ export const useAppStore = create<AppState>()(
         sessionSummaries: state.sessionSummaries,
         dailyChallenge: state.dailyChallenge,
         quickNotes: state.quickNotes,
+        reviewCards: state.reviewCards,
+        moodLogs: state.moodLogs,
+        messageReactions: state.messageReactions,
+        sessionStartTime: state.sessionStartTime,
       }),
     }
   )
