@@ -439,3 +439,84 @@ Stage Summary:
 - Pomodoro widget enhanced with circular progress ring, session labels, 3 sound options, ETA
 - Store extended with currentlySpeakingId, learningStreakCalendar, motivationalQuote, pomodoroSound
 - Persist key updated to sitwithme-v10
+
+---
+Task ID: 9
+Agent: Main Agent (v10.0 QA + Bug Fix Round)
+Task: QA Testing, Critical Onboarding Bug Fix, v10.0 Deployment
+
+Work Log:
+- Read worklog.md — v9.0 AGENTIC was the last documented stable version
+- Performed QA testing with agent-browser: Landing → Signup → API Key → Onboarding → Profile → Google Connect → Main App
+- **CRITICAL BUG FOUND & FIXED**: Onboarding progress stuck at 0/8 throughout entire conversation
+  - Root cause: profileFields counter relied on store fields (topic, vision, etc.) which were only set when AI signaled [DONE] at the end of onboarding
+  - Fix: Modified /api/ai/onboard route to include [PROGRESS: {...}] marker in system prompt, requiring AI to include progress data after every response
+  - Fix: API now returns progressData alongside reply, extracted from [PROGRESS: {...}] marker
+  - Fix: API incrementally updates user DB record with discovered fields on each response
+  - Fix: Frontend now incrementally updates Zustand store from progressData after each message
+  - Enhancement: Added field indicator pills (📚Topic, 🌟Vision, 🎯Domain, 📊Level, ⏰Time, 🎨Style, 💪Why, 🚧Hurdle) with filled/unfilled states
+  - Enhancement: Added "Skip to Profile" button when minimum fields (topic + level) are discovered
+  - Enhancement: Added progress-shimmer class to progress bar
+- Created /api/ai/tts route for TTS voice integration
+- Delegated v10.0 feature/styling upgrade to full-stack developer subagent
+- Verified incremental onboarding progress: Step 0→1→2→3→8 as conversation progresses
+- All 9 tabs verified working
+- No browser errors
+- Lint check: 0 errors
+- Pushed v10.0 to GitHub: coders786/sit-with-me main branch
+
+Critical Bugs Fixed:
+1. **Onboarding progress stuck at 0/8**: Incremental extraction via [PROGRESS] marker, store updates per response
+
+Stage Summary:
+- App upgraded from v9.0 to v10.0 AGENTIC
+- Critical onboarding progress bug fixed
+- 10+ major features/styling improvements (TTS, dashboard, landing overhaul, pomodoro enhancement, etc.)
+- All code lint-clean (0 errors)
+- Pushed to GitHub: coders786/sit-with-me
+
+## Current Project Status
+
+The "Sit With Me" learning companion app is at **v10.0 AGENTIC** and is stable. The app is a full Next.js 16 single-page application with:
+
+- **9 main tabs**: Session, Plan, Tasks, Progress, Resources, Review, Think Space, Room, Settings
+- **Complete auth flow**: Landing → Signup → API Key → AI Onboarding (with incremental progress) → Profile → Google Connect → Main App
+- **AI-powered features**: Chat mentor, incremental onboarding extraction, plan generation, auto-task extraction, resource curation, daily challenges, session summaries, spaced repetition, smart suggestions, TTS voice
+- **Rich UI**: Dark/Light theme, gradient mesh landing, aurora background, framer-motion transitions, Radix tooltips, glassmorphism, confetti, pomodoro timer with SVG ring, focus mode, command palette (13 commands), keyboard shortcuts (1-9), thinking ripple, chat input glow, floating skill tags
+- **Gamification**: XP/Level system, achievement badges (8), daily challenges, streaks, weekly heatmap, mood tracker, radial mastery circle, skill radar chart, learning streak calendar
+- **Data Management**: Export/import JSON, review settings, session preferences, data management
+
+## Current Goals / Completed Modifications / Verification Results
+
+| Goal | Status | Notes |
+|------|--------|-------|
+| Onboarding Progress Bug | ✅ Fixed | Incremental extraction via [PROGRESS] marker, field indicator pills |
+| TTS Voice Integration | ✅ Implemented | Speaker button, Read Aloud chip, global audio tracking |
+| Landing Page Overhaul | ✅ Implemented | Gradient mesh, floating tags, How It Works, parallax cards |
+| Main App Styling | ✅ Enhanced | Noise sidebar, glass top bar, gradient borders, hover glows |
+| Dashboard Widgets | ✅ Implemented | Streak calendar, quick stats, motivational quotes |
+| Pomodoro Enhancement | ✅ Implemented | SVG ring, session labels, sound selection, ETA |
+| Chat Enhancements | ✅ Implemented | Scroll-to-bottom, code copy, reaction counts |
+| Version Upgrade | ✅ Done | v9.0 → v10.0, persist key v9 → v10 |
+| QA Testing | ✅ Complete | Full flow tested, incremental onboarding verified |
+| Lint Check | ✅ 0 errors | Clean code |
+| GitHub Push | ✅ Pushed | coders786/sit-with-me main branch |
+
+## Unresolved Issues / Risks / Next Phase Recommendations
+
+### Unresolved Issues
+1. **Google OAuth not connected** — Uses demo mode. Needs real GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET
+2. **API key persistence** — Gemini API key stored server-side but not re-tested on app load
+3. **TTS may need audio format handling** — z-ai-web-dev-sdk TTS response format may vary; needs testing with real API key
+4. **No real-time sync** — Room chat uses polling instead of WebSocket
+5. **Mobile navigation** — 9 tabs may be too many; mobile bottom nav shows only 5 + "More" drawer
+6. **Large file size** — page.tsx is ~5300+ lines; should consider splitting into components for maintainability
+
+### Priority Recommendations for Next Phase
+1. **WebSocket for Room Chat** — Replace polling with socket.io for real-time chat
+2. **Google Calendar Push** — Implement actual Google Calendar event creation via API
+3. **Component Extraction** — Split page.tsx into separate component files for maintainability
+4. **Mobile Bottom Sheet** — Use vaul Drawer for mobile "More tabs" navigation
+5. **Hugging Face Deployment** — Deploy to HF Spaces for public access
+6. **Auto-generate Flashcards from Chat** — When autoGenerateFlashcards is enabled, auto-create ReviewCards from key concepts
+7. **Collaborative Learning** — Add study groups or pair learning features
