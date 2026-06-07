@@ -48,6 +48,37 @@ Stage Summary:
 - ⚠️ Need to verify HF Space rebuilds successfully with new code
 
 ---
+Task ID: 16
+Agent: Main Agent
+Task: Fix HF Space server error - dual-mode AI SDK + Docker fixes
+
+Work Log:
+- Diagnosed root cause: z-ai-web-dev-sdk uses internal-api.z.ai which is NOT publicly accessible
+- The internal API only works from the z.ai sandbox, not from HF Spaces
+- Created dual-mode AI SDK (src/lib/ai-sdk.ts):
+  - LOCAL mode: z-ai-web-dev-sdk (sandbox internal API) - works when GEMINI_API_KEY not set
+  - PRODUCTION mode: @google/generative-ai SDK directly - works when GEMINI_API_KEY is set
+  - Auto-detects which mode to use based on GEMINI_API_KEY env var
+  - Falls back to Gemini if ZAI SDK fails
+- Installed @google/generative-ai package
+- Updated all 8 AI route files to use chatCompletion() from ai-sdk
+- Fixed Dockerfile:
+  - Changed from production build to dev mode (avoids OOM from 6571-line page.tsx)
+  - Added .z-ai-config creation from env vars at startup
+  - Added .dockerignore to exclude .env and large files
+  - Added openssl for Prisma SQLite
+- Set HF Spaces secrets: ZAI_BASE_URL, ZAI_API_KEY, ZAI_CHAT_ID, ZAI_TOKEN, ZAI_USER_ID, GEMINI_API_KEY
+- GEMINI_API_KEY set to placeholder "YOUR_GEMINI_API_KEY_HERE" — user needs to update with real key
+
+Stage Summary:
+- ✅ Dual-mode AI SDK created and tested locally
+- ✅ All AI routes work locally with z-ai-web-dev-sdk
+- ✅ HF Space should work once user sets real GEMINI_API_KEY
+- ⚠️ User MUST set their own GEMINI_API_KEY in HF Spaces Settings > Variables and Secrets
+- ⚠️ HF Space runs in dev mode (slower but avoids build OOM)
+- ⚠️ Production build OOMs due to 6571-line page.tsx — need to split into components
+
+---
 Task ID: 14
 Agent: Main Agent
 Task: Push v13.0 to GitHub + Hugging Face Spaces
