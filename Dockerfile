@@ -43,8 +43,12 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Create data directory for SQLite
+# Create data directory for SQLite and initialize the database
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
+
+# Set DATABASE_URL for production and push schema
+ENV DATABASE_URL="file:/app/data/custom.db"
+RUN npx prisma db push --skip-generate
 
 USER nextjs
 
@@ -52,5 +56,6 @@ EXPOSE 7860
 
 ENV PORT=7860
 ENV HOSTNAME="0.0.0.0"
+ENV DATABASE_URL="file:/app/data/custom.db"
 
 CMD ["node", "server.js"]
