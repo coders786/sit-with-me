@@ -1,30 +1,36 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt } from '@/lib/ai-personality';
 
-const ONBOARDING_SYSTEM_PROMPT = `You are the onboarding companion for "Sit With Me" — an AI learning companion app. Your job is to have a warm, Socratic conversation to discover the user's learning goals. 
+const ONBOARDING_ADDITIONAL_RULES = [
+  `WHAT YOU'RE DOING: Having a warm, real conversation to learn about someone. You want to discover these things naturally (not like a questionnaire):`,
+  `1. topic — What lights them up? What do they want to learn?`,
+  `2. vision — What's the dream? Not just "learn React" but "build my own app and quit my job" kind of stuff`,
+  `3. domain — What world does this live in? Tech, art, languages, business...`,
+  `4. level — Are they just starting out, getting somewhere, or already pretty deep?`,
+  `5. minutesPerDay — How much time can they realistically put in? (just a number)`,
+  `6. learningStyle — Do they like watching, reading, doing, talking it through?`,
+  `7. whyNow — What made them decide "today's the day"?`,
+  `8. obstacle — What's the thing that usually stops them? Time? Focus? Overwhelm? Fear?`,
+  ``,
+  `Ask ONE thing at a time. Let the conversation flow — don't make it feel like an interview. React to what they say before moving on. If they mention something interesting, dig into it a bit.`,
+  ``,
+  `IMPORTANT — After EVERY response, include a progress marker on its own line at the very end:`,
+  `[PROGRESS: {"topic": value_or_null, "vision": value_or_null, "domain": value_or_null, "level": value_or_null, "minutesPerDay": value_or_null, "learningStyle": value_or_null, "whyNow": value_or_null, "obstacle": value_or_null}]`,
+  `Only fill in a field if you're pretty sure about it from the conversation. Leave it null if you haven't figured it out yet.`,
+  ``,
+  `After 3-4 good exchanges (once you've got at minimum: topic, vision, and level), add [DONE] before the progress marker:`,
+  `[DONE]`,
+  `[PROGRESS: {"topic":"...","vision":"...","domain":"...","level":"...","minutesPerDay":"...","learningStyle":"...","whyNow":"...","obstacle":"..."}]`,
+  ``,
+  `Don't stretch it out forever — aim to wrap up in 3-5 exchanges. Be warm but efficient. You want them to feel like they just had a great conversation, not sat through intake forms.`,
+];
 
-Ask ONE question at a time. Be genuinely curious and encouraging. Your goal is to discover:
-1. **topic** — What do they want to learn? (e.g., "React", "Machine Learning", "Spanish")
-2. **vision** — What's their dream outcome? (e.g., "Build my own SaaS", "Get a data science job")
-3. **domain** — What field/industry? (e.g., "Web Development", "Data Science", "Language Learning")
-4. **level** — Current skill level? (beginner, intermediate, advanced)
-5. **minutesPerDay** — How many minutes per day can they dedicate? (number)
-6. **learningStyle** — How do they learn best? (visual, reading, hands-on, discussion)
-7. **whyNow** — Why are they starting now? (motivation)
-8. **obstacle** — What's their biggest obstacle? (time, focus, overwhelm, etc.)
-
-Start by asking what they want to learn. Flow naturally through the questions — don't make it feel like a form. Adapt your questions based on their answers.
-
-CRITICAL RULE: After EVERY response, you MUST include a progress marker on its own line at the very end:
-[PROGRESS: {"topic": value_or_null, "vision": value_or_null, "domain": value_or_null, "level": value_or_null, "minutesPerDay": value_or_null, "learningStyle": value_or_null, "whyNow": value_or_null, "obstacle": value_or_null}]
-Set a field to its extracted value ONLY if you are confident about it from the conversation so far. Set it to null if you haven't discovered it yet.
-
-After 3-4 exchanges (once you have at minimum: topic, vision, and level), also include [DONE] before the progress marker to signal completion:
-[DONE]
-[PROGRESS: {"topic":"...","vision":"...","domain":"...","level":"...","minutesPerDay":"...","learningStyle":"...","whyNow":"...","obstacle":"..."}]
-
-Only include fields you are confident about. It's OK to leave fields as null if you couldn't discover them naturally. Aim to complete onboarding in 3-5 exchanges total — be efficient but warm.`;
+const ONBOARDING_SYSTEM_PROMPT = buildSystemPrompt({
+  tone: 'onboarding',
+  additionalRules: ONBOARDING_ADDITIONAL_RULES,
+});
 
 export async function POST(request: Request) {
   try {
@@ -75,7 +81,7 @@ export async function POST(request: Request) {
       temperature: 0.9,
     });
 
-    const reply = result?.choices?.[0]?.message?.content || result?.content || "I'd love to hear more. What would you like to learn?";
+    const reply = result?.choices?.[0]?.message?.content || result?.content || "Hey, I didn't quite catch that — mind telling me again?";
 
     // Save assistant message
     await db.chatMessage.create({
@@ -95,13 +101,12 @@ export async function POST(request: Request) {
       done = true;
     }
 
-    // Extract progress data from [PROGRESS: {...}] marker (present in every response)
+    // Extract progress data from [PROGRESS: {...}] marker
     let progressData: Record<string, string | null> | undefined;
     const progressMatch = reply.match(/\[PROGRESS:\s*(\{[\s\S]*?\})\]/);
     if (progressMatch) {
       try {
         progressData = JSON.parse(progressMatch[1]);
-        // Use progressData as extractedData if done
         if (done) {
           extractedData = progressData;
         }
@@ -124,7 +129,6 @@ export async function POST(request: Request) {
               data: updateData,
             });
 
-            // Update profile goal if vision is set
             if (progressData.vision && !user.vision) {
               const existingProfile = await db.profile.findUnique({ where: { userId: user.id } });
               if (existingProfile) {
@@ -154,7 +158,6 @@ export async function POST(request: Request) {
         console.error('[ai/onboard] JSON parse error:', parseError);
       }
 
-      // Update user profile with extracted data
       if (extractedData) {
         const updateData: Record<string, unknown> = {};
         if (extractedData.topic) updateData.topic = extractedData.topic;
@@ -175,25 +178,21 @@ export async function POST(request: Request) {
       }
     }
 
-    // If done and we have progressData, also set extractedData
     if (done && progressData && !extractedData) {
       extractedData = progressData;
     }
 
-    // Clean up the reply — remove [DONE], [PROGRESS: ...] and JSON from visible response
+    // Clean up the reply — remove markers from visible response
     let cleanReply = reply;
-    // Remove [PROGRESS: {...}]
     cleanReply = cleanReply.replace(/\[PROGRESS:\s*\{[\s\S]*?\}\]/g, '').trim();
-    // Remove [DONE]
     if (done) {
       const doneIndex = cleanReply.indexOf('[DONE]');
       if (doneIndex >= 0) {
         cleanReply = cleanReply.slice(0, doneIndex).trim();
       }
-      // Remove any trailing JSON block
       cleanReply = cleanReply.replace(/\{[\s\S]*"topic"[\s\S]*\}/g, '').trim();
       if (!cleanReply) {
-        cleanReply = "Wonderful! I've got a great picture of your learning goals. Let's get started! 🎉";
+        cleanReply = "That's everything I need — let's get you started! 🎉";
       }
     }
 

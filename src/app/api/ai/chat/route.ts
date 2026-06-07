@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
   try {
@@ -31,31 +32,28 @@ export async function POST(request: Request) {
       },
     });
 
-    // Build system prompt from user's learning profile
-    const profileParts: string[] = [
-      'You are "Sit With Me" — a warm, encouraging AI learning companion. You help people learn through Socratic dialogue, adaptive planning, and emotional support. Be conversational, concise, and genuinely curious.',
-    ];
+    // Build context from user's learning profile
+    const profileContext = buildUserProfileContext(user);
 
-    if (user.topic) profileParts.push(`Their learning topic: ${user.topic}`);
-    if (user.vision) profileParts.push(`Their vision: ${user.vision}`);
-    if (user.domain) profileParts.push(`Domain: ${user.domain}`);
-    if (user.level) profileParts.push(`Current level: ${user.level}`);
-    if (user.minutesPerDay) profileParts.push(`Available minutes per day: ${user.minutesPerDay}`);
-    if (user.learningStyle) profileParts.push(`Preferred learning style: ${user.learningStyle}`);
-    if (user.whyNow) profileParts.push(`Why they are learning now: ${user.whyNow}`);
-    if (user.obstacle) profileParts.push(`Their main obstacle: ${user.obstacle}`);
+    const additionalRules: string[] = [];
 
     if (boost) {
-      profileParts.push('The user asked for a BOOST — be extra encouraging, celebrate their progress, and offer a motivational micro-challenge.');
+      additionalRules.push(
+        `The person just asked for a BOOST — they need some encouragement right now. Be genuinely uplifting. Celebrate what they've done so far (even small wins count). Then give them one tiny thing they can do right now that feels like a win. Don't be cheesy — be real.`,
+      );
     }
 
-    profileParts.push(
-      'When the user mentions tasks or deadlines, acknowledge them and suggest creating a task.',
-      'When the user mentions scheduling or time management, suggest using the plan feature.',
-      'Keep responses under 200 words unless the user asks for depth. Use markdown for formatting when helpful.',
+    additionalRules.push(
+      `If they mention something that sounds like a task or deadline, you can suggest creating one — but don't be pushy about it.`,
+      `If they're talking about scheduling or feeling overwhelmed with time, mention the plan feature naturally.`,
+      `Keep it under 200 words unless they're asking for something deep. You're having a conversation, not writing an essay.`,
     );
 
-    const systemPrompt = profileParts.join('\n');
+    const systemPrompt = buildSystemPrompt({
+      tone: 'chat',
+      context: profileContext || undefined,
+      additionalRules,
+    });
 
     // Build messages array
     const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
@@ -83,7 +81,7 @@ export async function POST(request: Request) {
     });
 
     // Extract the reply text
-    const reply = result?.choices?.[0]?.message?.content || result?.content || 'I am here with you. Could you tell me more?';
+    const reply = result?.choices?.[0]?.message?.content || result?.content || "Hmm, I'm here — tell me more?";
 
     // Save assistant message
     await db.chatMessage.create({

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
   try {
@@ -16,21 +17,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid session token' }, { status: 401 });
     }
 
+    const profileContext = buildUserProfileContext(user);
+
+    const systemPrompt = buildSystemPrompt({
+      tone: 'challenge',
+      context: profileContext || undefined,
+      additionalRules: [
+        `Create ONE daily learning challenge. It should take 10-20 minutes and feel achievable — not intimidating.`,
+        `Return ONLY JSON, no other text:`,
+        `{"title": "a catchy title that makes you want to try it", "description": "1-2 sentences explaining what to do — write it like you're daring a friend", "xpReward": 20}`,
+        ``,
+        `Make the title punchy and fun. Make the description feel like a personal challenge, not homework.`,
+      ],
+    });
+
     const zai = await ZAI.create();
     const result = await zai.chat.completions.create({
       model: 'gemini-2.0-flash',
       messages: [
-        {
-          role: 'system',
-          content: `You are a learning challenge generator. Based on the user's profile, create ONE daily learning challenge. The challenge should be achievable in 10-20 minutes. Respond ONLY in this exact JSON format, no other text:
-{"title": "short title", "description": "1-2 sentence description of what to do", "xpReward": 20}
-
-User's topic: ${user.topic || 'general learning'}
-User's level: ${user.level || 'beginner'}
-User's learning style: ${user.learningStyle || 'hands-on'}
-User's obstacle: ${user.obstacle || 'none'}`,
-        },
-        { role: 'user', content: 'Generate a daily challenge for me.' },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Give me a challenge for today.' },
       ],
       temperature: 1.0,
     });
@@ -39,9 +45,9 @@ User's obstacle: ${user.obstacle || 'none'}`,
     let parsed;
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { title: 'Review a concept', description: 'Pick one thing you learned recently and explain it in your own words.', xpReward: 20 };
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { title: 'Explain it to a friend', description: 'Pick one thing you learned recently and try explaining it to someone who knows nothing about it — out loud or in writing. If you can explain it simply, you really get it.', xpReward: 20 };
     } catch {
-      parsed = { title: 'Review a concept', description: 'Pick one thing you learned recently and explain it in your own words.', xpReward: 20 };
+      parsed = { title: 'Explain it to a friend', description: 'Pick one thing you learned recently and try explaining it to someone who knows nothing about it — out loud or in writing. If you can explain it simply, you really get it.', xpReward: 20 };
     }
 
     const challenge = {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
   try {
@@ -16,59 +17,51 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid session token' }, { status: 401 });
     }
 
-    // Build context-aware prompt
-    const profileContext: string[] = [];
-    if (user.topic) profileContext.push(`Learning topic: ${user.topic}`);
-    if (user.vision) profileContext.push(`Vision: ${user.vision}`);
-    if (user.domain) profileContext.push(`Domain: ${user.domain}`);
-    if (user.level) profileContext.push(`Current level: ${user.level}`);
-    if (user.minutesPerDay) profileContext.push(`Available minutes per day: ${user.minutesPerDay}`);
-    if (user.learningStyle) profileContext.push(`Preferred learning style: ${user.learningStyle}`);
-    if (user.whyNow) profileContext.push(`Motivation: ${user.whyNow}`);
-    if (user.obstacle) profileContext.push(`Main obstacle: ${user.obstacle}`);
+    const profileContext = buildUserProfileContext(user);
 
-    const systemPrompt = `You are a learning path architect for "Sit With Me" — an AI learning companion. Based on the user's topic, level, and learning style, generate a 4-phase learning path.
-
-Each phase represents a major stage of their learning journey. Return your response as JSON with this EXACT structure (no markdown, no code blocks):
-{
-  "phases": [
-    {
-      "phase": 1,
-      "title": "Short phase title",
-      "description": "2-3 sentence description of what this phase covers and why it matters",
-      "estimatedWeeks": 2,
-      "milestones": [
-        {"text": "Complete this milestone", "completed": false},
-        {"text": "Achieve this goal", "completed": false},
-        {"text": "Master this concept", "completed": false}
+    const systemPrompt = buildSystemPrompt({
+      tone: 'path',
+      context: profileContext || undefined,
+      additionalRules: [
+        `Generate a 4-phase learning path. Return it as JSON with this EXACT structure (no markdown, no code blocks):`,
+        `{`,
+        `  "phases": [`,
+        `    {`,
+        `      "phase": 1,`,
+        `      "title": "A name that means something (not 'Phase 1: Fundamentals')",`,
+        `      "description": "2-3 sentences about what this phase covers — write it like you're telling them what's coming up and why it matters",`,
+        `      "estimatedWeeks": 2,`,
+        `      "milestones": [`,
+        `        {"text": "A real milestone they'd actually celebrate reaching", "completed": false},`,
+        `        {"text": "Another achievable win", "completed": false},`,
+        `        {"text": "The 'aha moment' milestone", "completed": false}`,
+        `      ],`,
+        `      "resources": [`,
+        `        {"title": "A resource you'd genuinely recommend", "url": "https://example.com"}`,
+        `      ]`,
+        `    }`,
+        `  ]`,
+        `}`,
+        ``,
+        `Rules:`,
+        `- Phase 1: Getting started / foundations — make it feel exciting, not intimidating`,
+        `- Phase 2: Building on what they know — going deeper`,
+        `- Phase 3: Advanced stuff — where it gets really interesting`,
+        `- Phase 4: Mastery / real projects — putting it all together`,
+        `- Each phase needs 3-4 milestones that feel like real achievements, not checkboxes`,
+        `- 1-2 resources per phase that you'd actually tell a friend about`,
+        `- Adjust estimatedWeeks based on their level — beginners need more time, advanced folks can move faster`,
+        `- Factor in how much time they have each day`,
+        `- Think about how they learn best when picking resources`,
       ],
-      "resources": [
-        {"title": "Resource Name", "url": "https://example.com"}
-      ]
-    }
-  ]
-}
-
-Rules:
-- Phase 1 should always be fundamentals/foundations for the topic
-- Phase 2 should build on Phase 1 with more depth
-- Phase 3 should cover advanced/specialized topics
-- Phase 4 should be mastery/application/project-based
-- Each phase should have 3-4 milestones
-- Each phase should have 1-2 learning resources with real URLs where possible
-- Adjust estimatedWeeks based on the user's level (beginner = longer phases, advanced = shorter)
-- Account for the user's daily time commitment
-- Consider their learning style when suggesting resources
-
-User's learning profile:
-${profileContext.join('\n')}`;
+    });
 
     const zai = await ZAI.create();
     const result = await zai.chat.completions.create({
       model: 'gemini-2.0-flash',
       messages: [
-        { role: 'assistant', content: systemPrompt },
-        { role: 'user', content: 'Generate my personalized 4-phase learning path.' },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'Map out my learning journey.' },
       ],
       temperature: 0.8,
     });
@@ -87,14 +80,13 @@ ${profileContext.join('\n')}`;
       }
     } catch (parseError) {
       console.error('[ai/path] JSON parse error:', parseError, 'Content:', content.slice(0, 200));
-      // Fallback path
       const topic = user.topic || 'your topic';
       pathData = {
         phases: [
-          { phase: 1, title: 'Foundations', description: `Build a solid understanding of ${topic} fundamentals.`, estimatedWeeks: 2, milestones: [{ text: 'Understand core concepts', completed: false }, { text: 'Complete introductory tutorial', completed: false }, { text: 'Build first simple project', completed: false }], resources: [{ title: `${topic} Official Docs`, url: '#' }] },
-          { phase: 2, title: 'Growth', description: `Deepen your ${topic} skills with more complex topics.`, estimatedWeeks: 3, milestones: [{ text: 'Master intermediate patterns', completed: false }, { text: 'Build a portfolio project', completed: false }, { text: 'Solve practice problems', completed: false }], resources: [{ title: `${topic} Advanced Guide`, url: '#' }] },
-          { phase: 3, title: 'Mastery', description: `Tackle advanced ${topic} concepts and real-world applications.`, estimatedWeeks: 3, milestones: [{ text: 'Understand advanced patterns', completed: false }, { text: 'Contribute to a project', completed: false }, { text: 'Teach concepts to others', completed: false }], resources: [{ title: `${topic} Community`, url: '#' }] },
-          { phase: 4, title: 'Application', description: `Apply your ${topic} expertise to build something meaningful.`, estimatedWeeks: 2, milestones: [{ text: 'Design and build a capstone project', completed: false }, { text: 'Get feedback from peers', completed: false }, { text: 'Document your journey', completed: false }], resources: [{ title: 'Project Ideas', url: '#' }] },
+          { phase: 1, title: 'Getting Your Feet Wet', description: `Starting with the basics of ${topic} — the stuff that'll make everything else click.`, estimatedWeeks: 2, milestones: [{ text: 'Understand the core ideas', completed: false }, { text: 'Finish your first intro tutorial', completed: false }, { text: 'Build something tiny but real', completed: false }], resources: [{ title: `${topic} Official Docs`, url: '#' }] },
+          { phase: 2, title: 'Finding Your Rhythm', description: `Getting deeper into ${topic} and starting to connect the dots.`, estimatedWeeks: 3, milestones: [{ text: 'Handle intermediate-level stuff confidently', completed: false }, { text: 'Build a project worth showing', completed: false }, { text: 'Solve problems without following a guide', completed: false }], resources: [{ title: `${topic} Advanced Guide`, url: '#' }] },
+          { phase: 3, title: 'Going Deeper', description: `Tackling the advanced ${topic} territory — this is where it gets fun.`, estimatedWeeks: 3, milestones: [{ text: 'Understand the patterns pros use', completed: false }, { text: 'Contribute to something bigger', completed: false }, { text: 'Teach it to someone else', completed: false }], resources: [{ title: `${topic} Community`, url: '#' }] },
+          { phase: 4, title: 'Making It Yours', description: `Putting your ${topic} skills to work on something that matters to you.`, estimatedWeeks: 2, milestones: [{ text: 'Ship a capstone project', completed: false }, { text: 'Get real feedback', completed: false }, { text: 'Look back and see how far you\'ve come', completed: false }], resources: [{ title: 'Project Ideas', url: '#' }] },
         ],
       };
     }

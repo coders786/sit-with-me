@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
   try {
@@ -22,16 +23,22 @@ export async function POST(request: Request) {
 
     const conversationText = messages.map((m: { role: string; content: string }) => `${m.role}: ${m.content}`).join('\n');
 
+    const systemPrompt = buildSystemPrompt({
+      tone: 'summary',
+      additionalRules: [
+        `Summarize this learning session. Return ONLY JSON, no other text:`,
+        `{"summary": "2-3 sentences about what went down — write it like you're telling a friend who missed the session", "keyPoints": ["the main takeaways, written like you'd actually say them"]}`,
+        ``,
+        `The summary should capture the vibe and the substance. The key points should be things worth remembering, not generic observations.`,
+      ],
+    });
+
     const zai = await ZAI.create();
     const result = await zai.chat.completions.create({
       model: 'gemini-2.0-flash',
       messages: [
-        {
-          role: 'system',
-          content: `You are a learning session summarizer. Given a conversation between a student and their AI mentor, create a concise session summary. Respond ONLY in this exact JSON format, no other text:
-{"summary": "2-3 sentence overview of what was covered", "keyPoints": ["point 1", "point 2", "point 3"]}`,
-        },
-        { role: 'user', content: `Summarize this learning session:\n\n${conversationText}` },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Here's the session — what happened?\n\n${conversationText}` },
       ],
       temperature: 0.5,
     });
@@ -40,13 +47,13 @@ export async function POST(request: Request) {
     let parsed;
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);
-      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { summary: 'Session completed.', keyPoints: [] };
+      parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : { summary: 'Session wrapped up.', keyPoints: [] };
     } catch {
-      parsed = { summary: 'Session completed.', keyPoints: [] };
+      parsed = { summary: 'Session wrapped up.', keyPoints: [] };
     }
 
     return NextResponse.json({
-      summary: parsed.summary || 'Session completed.',
+      summary: parsed.summary || 'Session wrapped up.',
       keyPoints: parsed.keyPoints || [],
     });
   } catch (error) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
   try {
@@ -16,20 +17,26 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid session token' }, { status: 401 });
     }
 
+    const profileContext = buildUserProfileContext(user);
+
+    const systemPrompt = buildSystemPrompt({
+      tone: 'resources',
+      context: profileContext || undefined,
+      additionalRules: [
+        `Suggest 6-8 learning resources. Think like you're sending links to a friend — pick stuff that's actually good, not just top Google results.`,
+        `Return ONLY JSON array, no other text:`,
+        `[{"title": "resource name that sounds interesting", "type": "video|article|interactive|podcast", "source": "platform name", "difficulty": "beginner|intermediate|advanced", "url": "https://example.com"}]`,
+        ``,
+        `Pick resources you'd genuinely recommend — the kind that makes you go "oh this is really well done." Prefer practical over academic, engaging over dry.`,
+      ],
+    });
+
     const zai = await ZAI.create();
     const result = await zai.chat.completions.create({
       model: 'gemini-2.0-flash',
       messages: [
-        {
-          role: 'system',
-          content: `You are a learning resource curator. Based on the user's profile, suggest 6-8 learning resources. Respond ONLY in this exact JSON array format, no other text:
-[{"title": "resource title", "type": "video|article|interactive|podcast", "source": "platform name", "difficulty": "beginner|intermediate|advanced", "url": "https://example.com"}]
-
-User's topic: ${user.topic || 'general learning'}
-User's level: ${user.level || 'beginner'}
-User's learning style: ${user.learningStyle || 'hands-on'}`,
-        },
-        { role: 'user', content: 'Suggest learning resources for me.' },
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: 'What should I check out to learn this?' },
       ],
       temperature: 0.7,
     });

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import ZAI from 'z-ai-web-dev-sdk';
+import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
@@ -18,49 +19,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid session token' }, { status: 401 });
     }
 
-    // Build context-aware prompt
-    const profileContext: string[] = [];
-    if (user.topic) profileContext.push(`Learning topic: ${user.topic}`);
-    if (user.vision) profileContext.push(`Vision: ${user.vision}`);
-    if (user.domain) profileContext.push(`Domain: ${user.domain}`);
-    if (user.level) profileContext.push(`Current level: ${user.level}`);
-    if (user.minutesPerDay) profileContext.push(`Available minutes per day: ${user.minutesPerDay}`);
-    if (user.learningStyle) profileContext.push(`Preferred learning style: ${user.learningStyle}`);
-    if (user.whyNow) profileContext.push(`Motivation: ${user.whyNow}`);
-    if (user.obstacle) profileContext.push(`Main obstacle: ${user.obstacle}`);
+    const profileContext = buildUserProfileContext(user);
 
-    const systemPrompt = `You are a learning plan designer for "Sit With Me" — an AI learning companion. Create a personalized 7-day learning plan.
-
-Based on the user's profile, design a week of focused learning. Each day should be achievable in their daily minutes, with one concrete first action.
-
-Return your response as JSON with this EXACT structure (no markdown, no code blocks):
-{
-  "summary": "A 2-3 sentence overview of the plan",
-  "adapts": "How this plan adapts to their level and obstacles",
-  "week": [
-    {
-      "day": "Monday",
-      "focus": "Short focus title for this day",
-      "minutes": 30,
-      "firstStep": "One concrete first action they can take right away",
-      "time": "18:00"
-    }
-  ]
-}
-
-Use actual day names (Monday through Sunday) for the "day" field.
-The "focus" should be a short descriptive phrase (e.g., "React Components & Props").
-The "firstStep" should be a concrete, actionable step.
-The "time" should be a suggested study time in HH:MM format.
-
-User's learning profile:
-${profileContext.join('\n')}`;
+    const systemPrompt = buildSystemPrompt({
+      tone: 'plan',
+      context: profileContext || undefined,
+      additionalRules: [
+        `Create a 7-day learning plan. Return it as JSON with this EXACT structure (no markdown, no code blocks):`,
+        `{`,
+        `  "summary": "A couple sentences about the plan — write it like you're telling a friend what the week looks like",`,
+        `  "adapts": "How this plan actually fits THEIR life, not a generic template",`,
+        `  "week": [`,
+        `    {`,
+        `      "day": "Monday",`,
+        `      "focus": "Short, punchy focus for this day (like 'Getting Your Feet Wet' not 'Introduction to Fundamental Concepts')",`,
+        `      "minutes": 30,`,
+        `      "firstStep": "One thing they can do RIGHT NOW to get started — make it dead simple",`,
+        `      "time": "18:00"`,
+        `    }`,
+        `  ]`,
+        `}`,
+        ``,
+        `Use real day names (Monday through Sunday).`,
+        `The "focus" should feel like a chapter title, not a syllabus entry.`,
+        `The "firstStep" should be something you'd actually tell a friend to do — concrete and immediate.`,
+        `The "time" is a suggested study time in HH:MM format.`,
+        `Make the plan feel doable and a little exciting, not like homework.`,
+      ],
+    });
 
     const zai = await ZAI.create();
     const result = await zai.chat.completions.create({
       model: 'gemini-2.0-flash',
       messages: [
-        { role: 'assistant', content: systemPrompt },
+        { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Create my personalized 7-day learning plan.' },
       ],
       temperature: 0.8,
@@ -80,26 +72,26 @@ ${profileContext.join('\n')}`;
       }
     } catch (parseError) {
       console.error('[ai/plan] JSON parse error:', parseError, 'Content:', content.slice(0, 200));
-      // Fallback plan with correct format
+      // Fallback plan
       planData = {
-        summary: `A 7-day progressive plan for learning ${user.topic || 'your topic'}.`,
-        adapts: 'Adjusted for your current level and time availability.',
+        summary: `A week of getting into ${user.topic || 'your topic'}, one step at a time.`,
+        adapts: 'Built around your schedule and where you\'re starting from.',
         week: DAYS.map((dayName, i) => ({
           day: dayName,
-          focus: `${user.topic || 'Learning'} Exploration - Part ${i + 1}`,
+          focus: `${user.topic || 'Learning'} — Day ${i + 1}`,
           minutes: parseInt(user.minutesPerDay || '20'),
-          firstStep: `Start with the basics of ${user.topic || 'your topic'} and practice for 15 minutes`,
+          firstStep: `Start with something small in ${user.topic || 'your topic'} — even 5 minutes counts.`,
           time: '18:00',
         })),
       };
     }
 
-    // Normalize week data to match frontend expectations
+    // Normalize week data
     const normalizedWeek = (planData.week || []).map((day, i) => ({
       day: typeof day.day === 'number' ? DAYS[(day.day - 1) % 7] || DAYS[i] : String(day.day || DAYS[i]),
       focus: (day as Record<string, unknown>).focus || (day as Record<string, unknown>).theme || `Day ${i + 1} Focus`,
       minutes: day.minutes || parseInt(user.minutesPerDay || '20'),
-      firstStep: (day as Record<string, unknown>).firstStep || ((day as Record<string, unknown>).tasks ? ((day as Record<string, unknown>).tasks as string[])[0] : 'Start with fundamentals') as string,
+      firstStep: (day as Record<string, unknown>).firstStep || ((day as Record<string, unknown>).tasks ? ((day as Record<string, unknown>).tasks as string[])[0] : 'Start with something small') as string,
       time: (day as Record<string, unknown>).time || '18:00',
     }));
 
