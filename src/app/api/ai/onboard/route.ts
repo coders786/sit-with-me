@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chatCompletion } from '@/lib/ai-sdk';
 import { buildSystemPrompt } from '@/lib/ai-personality';
 
 const ONBOARDING_ADDITIONAL_RULES = [
@@ -73,15 +73,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Call Gemini
-    const zai = await ZAI.create();
-    const result = await zai.chat.completions.create({
-      model: 'gemini-2.0-flash',
-      messages,
-      temperature: 0.9,
-    });
-
-    const reply = result?.choices?.[0]?.message?.content || result?.content || "Hey, I didn't quite catch that — mind telling me again?";
+    // Call AI via dual-mode SDK
+    const reply = await chatCompletion({ model: 'gemini-2.0-flash', messages, temperature: 0.9 });
 
     // Save assistant message
     await db.chatMessage.create({
@@ -111,7 +104,6 @@ export async function POST(request: Request) {
           extractedData = progressData;
         }
 
-        // Update user profile incrementally with discovered fields
         if (progressData) {
           const updateData: Record<string, unknown> = {};
           if (progressData.topic && !user.topic) updateData.topic = progressData.topic;

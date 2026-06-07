@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chatCompletion } from '@/lib/ai-sdk';
 import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -48,17 +48,14 @@ export async function POST(request: Request) {
       ],
     });
 
-    const zai = await ZAI.create();
-    const result = await zai.chat.completions.create({
+    const content = await chatCompletion({
       model: 'gemini-2.0-flash',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Create my personalized 7-day learning plan.' },
       ],
       temperature: 0.8,
-    });
-
-    const content = result?.choices?.[0]?.message?.content || result?.content || '';
+    }) || '';
 
     // Parse the JSON from the response
     let planData: { summary: string; adapts: string; week: Array<{ day: string; focus: string; minutes: number; firstStep: string; time?: string }> };

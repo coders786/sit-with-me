@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chatCompletion } from '@/lib/ai-sdk';
 import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
@@ -72,16 +72,7 @@ export async function POST(request: Request) {
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    // Call Gemini via z-ai-web-dev-sdk
-    const zai = await ZAI.create();
-    const result = await zai.chat.completions.create({
-      model: 'gemini-2.0-flash',
-      messages,
-      temperature: 0.9,
-    });
-
-    // Extract the reply text
-    const reply = result?.choices?.[0]?.message?.content || result?.content || "Hmm, I'm here — tell me more?";
+    const reply = await chatCompletion({ model: 'gemini-2.0-flash', messages, temperature: 0.9 }) || "Hmm, I'm here — tell me more?";
 
     // Save assistant message
     await db.chatMessage.create({

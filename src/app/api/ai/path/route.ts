@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chatCompletion } from '@/lib/ai-sdk';
 import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
@@ -56,17 +56,14 @@ export async function POST(request: Request) {
       ],
     });
 
-    const zai = await ZAI.create();
-    const result = await zai.chat.completions.create({
+    const content = await chatCompletion({
       model: 'gemini-2.0-flash',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Map out my learning journey.' },
       ],
       temperature: 0.8,
-    });
-
-    const content = result?.choices?.[0]?.message?.content || result?.content || '';
+    }) || '';
 
     // Parse the JSON from the response
     let pathData: { phases: Array<{ phase: number; title: string; description: string; estimatedWeeks: number; milestones: Array<{ text: string; completed: boolean }>; resources: Array<{ title: string; url: string }> }> };

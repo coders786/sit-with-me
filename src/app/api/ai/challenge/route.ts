@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chatCompletion } from '@/lib/ai-sdk';
 import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
@@ -31,17 +31,14 @@ export async function POST(request: Request) {
       ],
     });
 
-    const zai = await ZAI.create();
-    const result = await zai.chat.completions.create({
+    const text = await chatCompletion({
       model: 'gemini-2.0-flash',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Give me a challenge for today.' },
       ],
       temperature: 1.0,
-    });
-
-    const text = result?.choices?.[0]?.message?.content || result?.content || '{}';
+    }) || '{}';
     let parsed;
     try {
       const jsonMatch = text.match(/\{[\s\S]*\}/);

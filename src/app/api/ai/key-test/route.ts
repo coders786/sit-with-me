@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import ZAI from 'z-ai-web-dev-sdk';
+import { chatCompletion } from '@/lib/ai-sdk';
 
 export async function POST(request: Request) {
   try {
@@ -10,17 +10,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'API key is required' }, { status: 400 });
     }
 
-    // Try a simple call to Gemini using the SDK
-    const zai = await ZAI.create();
-    const result = await zai.chat.completions.create({
+    // Try a simple call to Gemini using the dual-sdk
+    const content = await chatCompletion({
       model: 'gemini-2.0-flash',
       messages: [
         { role: 'user', content: 'Say "OK" and nothing else.' },
       ],
       temperature: 0,
     });
-
-    const content = result?.choices?.[0]?.message?.content || result?.content;
 
     if (content) {
       return NextResponse.json({ ok: true });
