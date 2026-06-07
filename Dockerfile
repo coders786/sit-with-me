@@ -2,33 +2,44 @@ FROM node:22-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-RUN apk add --no-cache libc6-compat
+RUN apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 # Copy package files
-COPY package.json package-lock.json* bun.lockb* ./
+COPY package.json bun.lock ./
 COPY prisma ./prisma/
 
-# Install dependencies using npm (more reliable in Docker)
-RUN npm install --legacy-peer-deps
+# Install bun and dependencies
+RUN npm install -g bun
+RUN bun install
 
-# Rebuild the source code only when needed
+# Build stage
 FROM base AS builder
+RUN apk add --no-cache openssl
 WORKDIR /app
+
+# Set DATABASE_URL for build
+ENV DATABASE_URL="file:/app/data/build.db"
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the Next.js app (standalone output)
+# Build Next.js with extra memory for the large page.tsx (6571 lines / 308KB)
+# HF Spaces builder has ~16GB RAM, so 4GB heap should be fine
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# Production image, copy all the files and run next
+# Production image
 FROM base AS runner
+RUN apk add --no-cache openssl
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV DATABASE_URL="file:/app/data/custom.db"
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -38,16 +49,13 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
-# Copy Prisma schema and DB
+# Copy Prisma files
 COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 
-# Create data directory for SQLite and initialize the database
+# Create data dir and init DB
 RUN mkdir -p /app/data && chown nextjs:nodejs /app/data
-
-# Set DATABASE_URL for production and push schema
-ENV DATABASE_URL="file:/app/data/custom.db"
 RUN npx prisma db push --skip-generate
 
 USER nextjs
@@ -56,6 +64,5 @@ EXPOSE 7860
 
 ENV PORT=7860
 ENV HOSTNAME="0.0.0.0"
-ENV DATABASE_URL="file:/app/data/custom.db"
 
 CMD ["node", "server.js"]

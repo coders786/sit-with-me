@@ -1,0 +1,16 @@
+node_modules
+.next
+.git
+.gitignore
+.env*
+*.db
+*.png
+skills
+download
+.zscripts
+agent-ctx
+examples
+upload
+dev.log
+backup*
+.DS_Store
