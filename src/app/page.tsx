@@ -1679,6 +1679,17 @@ function LandingScreen() {
   const [loading, setLoading] = useState(false)
   const [authMode, setAuthMode] = useState<'signup' | 'login'>('signup')
 
+  // Handle Google OAuth error from redirect
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const error = params.get('error')
+    if (error === 'google' || error === 'OAuthSignin' || error === 'OAuthCallback' || error === 'OAuthAccountNotLinked') {
+      toast.error('Google sign-in isn\'t available on this hosted version. Use guest signup below — it works great!')
+      // Clean up URL
+      window.history.replaceState({}, '', '/')
+    }
+  }, [])
+
   const handleGuestSignup = async () => {
     if (!name.trim()) {
       toast.error('Please enter your name')
@@ -1695,7 +1706,7 @@ function LandingScreen() {
         provider: 'guest',
       })
       toast.success(`Welcome, ${name}!`)
-      setView('apikey')
+      setView('onboarding')
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Failed to create account')
     } finally {
@@ -1914,20 +1925,6 @@ function LandingScreen() {
                 <p className="text-xs text-muted-foreground">Let&apos;s tailor an AI mentor to your mind</p>
               </div>
 
-              <Button
-                className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold flex items-center justify-center gap-2 h-11 btn-hover"
-                onClick={() => { window.location.href = '/api/auth/signin/google' }}
-              >
-                <span className="text-lg font-bold text-blue-500">G</span>
-                Continue with Google
-              </Button>
-
-              <div className="flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or join anonymously</span>
-                <Separator className="flex-1" />
-              </div>
-
               <div>
                 <Label className="text-xs text-muted-foreground uppercase tracking-wider">Your Name</Label>
                 <Input
@@ -1944,7 +1941,22 @@ function LandingScreen() {
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold h-11 btn-hover"
               >
-                {loading ? 'Creating...' : 'Create Guest Account'} <ArrowRight className="w-4 h-4 ml-2" />
+                {loading ? 'Creating...' : 'Get Started — It\'s Free'} <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+
+              <div className="flex items-center gap-3">
+                <Separator className="flex-1" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or</span>
+                <Separator className="flex-1" />
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full border-[#272b34] hover:bg-[#191c23] font-medium flex items-center justify-center gap-2 h-11"
+                onClick={() => { window.location.href = '/api/auth/signin/google' }}
+              >
+                <span className="text-lg font-bold text-blue-500">G</span>
+                Continue with Google
               </Button>
             </div>
           ) : (
@@ -1955,25 +1967,26 @@ function LandingScreen() {
               </div>
 
               <Button
-                className="w-full bg-white text-gray-900 hover:bg-gray-100 font-semibold flex items-center justify-center gap-2 h-11 btn-hover"
-                onClick={() => { window.location.href = '/api/auth/signin/google' }}
-              >
-                <span className="text-lg font-bold text-blue-500">G</span>
-                Log In with Google
-              </Button>
-
-              <div className="flex items-center gap-3">
-                <Separator className="flex-1" />
-                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or resume session</span>
-                <Separator className="flex-1" />
-              </div>
-
-              <Button
                 onClick={handleResumeSession}
                 disabled={loading}
                 className="w-full bg-gradient-to-r from-[#7c9cff] to-[#9d7cff] text-[#0e0f13] font-semibold h-11 btn-hover"
               >
                 {loading ? 'Resuming...' : 'Resume Saved Session'} <ArrowRight className="w-4 h-4 ml-2" />
+              </Button>
+
+              <div className="flex items-center gap-3">
+                <Separator className="flex-1" />
+                <span className="text-[10px] text-muted-foreground uppercase tracking-widest">or</span>
+                <Separator className="flex-1" />
+              </div>
+
+              <Button
+                variant="outline"
+                className="w-full border-[#272b34] hover:bg-[#191c23] font-medium flex items-center justify-center gap-2 h-11"
+                onClick={() => { window.location.href = '/api/auth/signin/google' }}
+              >
+                <span className="text-lg font-bold text-blue-500">G</span>
+                Log In with Google
               </Button>
             </div>
           )}
