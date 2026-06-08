@@ -2,11 +2,22 @@ import NextAuth from 'next-auth';
 import GoogleProvider from 'next-auth/providers/google';
 import { db } from '@/lib/db';
 
+// Debug: Log env var status at module load time
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
+const nextauthSecret = process.env.NEXTAUTH_SECRET;
+const nextauthUrl = process.env.NEXTAUTH_URL;
+
+console.log('[NextAuth] GOOGLE_CLIENT_ID:', googleClientId ? `SET (${googleClientId.slice(0, 8)}...)` : 'MISSING');
+console.log('[NextAuth] GOOGLE_CLIENT_SECRET:', googleClientSecret ? `SET (${googleClientSecret.slice(0, 4)}...)` : 'MISSING');
+console.log('[NextAuth] NEXTAUTH_SECRET:', nextauthSecret ? 'SET' : 'MISSING');
+console.log('[NextAuth] NEXTAUTH_URL:', nextauthUrl || 'NOT SET');
+
 const handler = NextAuth({
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: googleClientId || '',
+      clientSecret: googleClientSecret || '',
       authorization: {
         params: {
           scope: 'openid email profile https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/gmail.readonly',
@@ -94,7 +105,6 @@ const handler = NextAuth({
   pages: {
     signIn: '/', // Use the app's landing page
   },
-  secret: process.env.NEXTAUTH_SECRET,
+  secret: nextauthSecret || undefined,
+  debug: true,
 });
-
-export { handler as GET, handler as POST };
