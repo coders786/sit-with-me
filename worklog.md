@@ -39,3 +39,40 @@ Task: Fix Google OAuth, AI SDK, and deploy to HF Spaces
 - GEMINI_API_KEY on HF Spaces is invalid (24 chars) — should be deleted or replaced with the correct key
 - Post-login redirect could be smoother (goes to onboarding for Google, works for guest)
 - The massive page.tsx (~6585 lines) still causes occasional OOM on low-memory instances
+
+---
+Task ID: session-2026-06-08-fix2
+Agent: Main Agent
+Task: Fix AI not working — onboarding and mentor broken on HF Spaces
+
+## Root Cause Analysis:
+1. **PRIMARY CAUSE**: `gemini-2.0-flash` and `gemini-2.0-flash-lite` models are **SHUT DOWN** by Google (confirmed in release notes: "June 1, 2026: gemini-2.0-flash, gemini-2.0-flash-001 are now shut down")
+2. This caused ALL AI endpoints to return 429/quota errors — not because of quota limits, but because the models no longer exist
+3. The fallback chain used `gemini-1.5-flash` and `gemini-1.5-flash-8b` which also returned 404 (not found)
+
+## Fix Applied:
+1. **Switched to Gemini 3 family** using official Google docs (https://ai.google.dev/gemini-api/docs/gemini-3):
+   - `gemini-3.1-flash-lite` — FAST model (was gemini-2.0-flash-lite) — $0.25/$1.50 per 1M tokens
+   - `gemini-3-flash-preview` — SMART model (was gemini-2.0-flash) — $0.50/$3 per 1M tokens
+2. **Switched SDK**: from `@google/generative-ai` (v0.24.1) to `@google/genai` (v2.8.0)
+   - New SDK supports Gemini 3's `thinkingConfig.thinkingLevel` parameter
+   - Uses `ai.models.generateContent()` API instead of old `genAI.getGenerativeModel().startChat().sendMessage()`
+3. **Simplified fallback chain**: gemini-3.1-flash-lite ↔ gemini-3-flash-preview
+4. **Updated debug endpoint** to use new SDK and test Gemini 3 models only
+
+## Verification Results:
+- `gemini-3.1-flash-lite` → ✅ SUCCESS (responds "Hello")
+- `gemini-3-flash-preview` → ✅ SUCCESS (responds "hello")
+- `/api/ai/onboard` → ✅ Returns human-like response with progress tracking
+- `/api/ai/chat` (mentor) → ✅ Returns detailed, conversational mentor response
+- Key source: GEMINI_KEY (39 chars, valid)
+
+## Key Files Changed:
+- `src/lib/ai-sdk.ts` — Complete rewrite: new SDK, new models, thinking_level support
+- `src/app/api/debug/ai/route.ts` — Updated for @google/genai SDK
+- `package.json` — Added @google/genai@^2.8.0
+
+## Unresolved Issues:
+- GEMINI_API_KEY on HF Spaces is invalid (24 chars) — should be deleted
+- The massive page.tsx (~6585 lines) still causes occasional OOM on low-memory instances
+- Should add thinking_level parameter to individual AI routes for fine-tuned control
