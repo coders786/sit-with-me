@@ -108,3 +108,5 @@ const handler = NextAuth({
   secret: nextauthSecret || undefined,
   debug: true,
 });
+
+export { handler as GET, handler as POST };
