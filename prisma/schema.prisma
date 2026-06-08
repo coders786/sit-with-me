@@ -47,6 +47,11 @@ model User {
   autoSchedule  Boolean   @default(true)
   voiceEnabled  Boolean   @default(false)
   
+  // UI state persistence (so user returns to where they left off)
+  currentView       String?   @default("landing") // landing, apikey, onboarding, profile, googleconnect, app
+  currentTab        String?   @default("chat")    // chat, tasks, plan, resources, profile, settings
+  onboardingDone    Boolean   @default(false)
+
   // Google connections
   calendarConnected Boolean @default(false)
   tasksConnected    Boolean @default(false)
