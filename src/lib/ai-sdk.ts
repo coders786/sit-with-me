@@ -5,14 +5,17 @@
  * PRODUCTION (HF Spaces etc): Uses Google Generative AI SDK directly
  * 
  * The SDK auto-detects which mode to use based on whether
- * the GEMINI_API_KEY environment variable is set.
+ * a valid Gemini API key is available.
  */
 
-import ZAI from 'z-ai-web-dev-sdk';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Detect mode
-const isProductionMode = !!process.env.GEMINI_API_KEY;
+// Detect which Gemini key to use (GEMINI_API_KEY preferred, fallback to GEMINI_KEY)
+const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY;
+const isProductionMode = !!GEMINI_KEY;
+
+console.log('[ai-sdk] Mode:', isProductionMode ? 'PRODUCTION (Gemini)' : 'LOCAL (z-ai-web-dev-sdk)');
+console.log('[ai-sdk] Key source:', process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : process.env.GEMINI_KEY ? 'GEMINI_KEY' : 'NONE');
 
 /**
  * Send a chat completion request using the best available SDK
@@ -46,7 +49,7 @@ async function geminiCompletion(
   temperature: number,
   maxTokens: number,
 ): Promise<string> {
-  const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+  const genAI = new GoogleGenerativeAI(GEMINI_KEY!);
 
   // Convert messages to Gemini format
   // Gemini uses "system instruction" + "history" format
@@ -56,7 +59,7 @@ async function geminiCompletion(
   const systemInstruction = systemMessages.map(m => m.content).join('\n');
 
   const genModel = genAI.getGenerativeModel({
-    model: model.replace('gemini-2.0-flash', 'gemini-2.0-flash'), // keep model name
+    model,
     systemInstruction: systemInstruction || undefined,
     generationConfig: {
       temperature,
@@ -104,6 +107,7 @@ async function zaiCompletion(
   temperature: number,
 ): Promise<string> {
   try {
+    const ZAI = (await import('z-ai-web-dev-sdk')).default;
     const zai = await ZAI.create();
     const result = await zai.chat.completions.create({
       model,
@@ -117,7 +121,7 @@ async function zaiCompletion(
   } catch (error) {
     console.error('[ai-sdk] ZAI SDK error, falling back to Gemini:', error);
     // If ZAI fails and we have a Gemini key, try that instead
-    if (process.env.GEMINI_API_KEY) {
+    if (GEMINI_KEY) {
       return geminiCompletion(model, messages, temperature, 2048);
     }
     throw error;
