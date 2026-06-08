@@ -76,3 +76,58 @@ Task: Fix AI not working — onboarding and mentor broken on HF Spaces
 - GEMINI_API_KEY on HF Spaces is invalid (24 chars) — should be deleted
 - The massive page.tsx (~6585 lines) still causes occasional OOM on low-memory instances
 - Should add thinking_level parameter to individual AI routes for fine-tuned control
+
+---
+Task ID: session-2026-06-08-fix3
+Agent: Main Agent
+Task: Add quick Google login + persistent session + remember progress/page
+
+## Research (Case Studies):
+- **Amazon/Spotify**: Long-lived sessions, skip login entirely if authenticated
+- **Notion/Vercel/Figma**: Prominent Google OAuth button with branded icon, one-tap signup
+- **Authgear UX Guide**: "Nothing is better than not asking the user to log in at all"
+- **OWASP/WorkOS**: Regenerate session after login, persistent tokens with secure storage
+- **Progressive Onboarding**: Save data as you go, indicate progress, don't lose info on dropoff
+
+## Changes Made:
+1. **Added `/api/auth/sync` endpoint** (save/load/full actions):
+   - Saves: currentView, currentTab, onboardingDone, learning profile, progress, settings
+   - Loads: Full user state from DB for hydration
+   - Progress uses `Math.max(local, server)` — never overwrites higher progress
+   - Silent failures for save (never blocks user)
+
+2. **Added DB fields on User model**:
+   - `currentView` (default: "landing") — where user left off
+   - `currentTab` (default: "chat") — which tab they were on
+   - `onboardingDone` (default: false) — whether onboarding is complete
+
+3. **Auto-resume session on page load**:
+   - If `sessionToken` exists and user is on landing → validate + hydrate + skip landing
+   - If `sessionToken` exists and user is past landing → hydrate in background
+   - If session expired → `clearAuth()` instead of stuck on broken state
+
+4. **Auto-save to server**:
+   - Every 30 seconds via `setInterval`
+   - On tab close/switch via `visibilitychange` event
+   - After guest signup (initial save)
+
+5. **Proper Google "G" SVG icon** on both signup and login buttons
+
+6. **Updated `handleResumeSession`**:
+   - Uses `hydrateFromServer()` instead of manual topic check
+   - Clears auth on expired session
+
+7. **Updated Google OAuth callback**:
+   - Calls `hydrateFromServer()` after setting auth
+   - View/tab restored from server instead of hardcoded
+
+## Key Files Changed:
+- `prisma/schema.prisma` — Added currentView, currentTab, onboardingDone fields
+- `src/app/api/auth/sync/route.ts` — NEW: sync endpoint
+- `src/app/page.tsx` — Added hydrateFromServer, saveToServer, auto-resume, auto-save, Google SVG
+
+## Unresolved Issues:
+- The massive page.tsx (~6600+ lines) still causes occasional OOM on low-memory instances
+- Should add CSRF state parameter to Google OAuth flow
+- Should add server-side logout endpoint
+- GEMINI_API_KEY on HF Spaces is invalid (24 chars) — should be deleted
