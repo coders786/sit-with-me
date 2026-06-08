@@ -1953,7 +1953,7 @@ function LandingScreen() {
               <Button
                 variant="outline"
                 className="w-full border-[#272b34] hover:bg-[#191c23] font-medium flex items-center justify-center gap-2 h-11"
-                onClick={() => { window.location.href = '/api/auth/signin/google' }}
+                onClick={() => { window.location.href = '/api/auth/google/signin' }}
               >
                 <span className="text-lg font-bold text-blue-500">G</span>
                 Continue with Google
@@ -1983,7 +1983,7 @@ function LandingScreen() {
               <Button
                 variant="outline"
                 className="w-full border-[#272b34] hover:bg-[#191c23] font-medium flex items-center justify-center gap-2 h-11"
-                onClick={() => { window.location.href = '/api/auth/signin/google' }}
+                onClick={() => { window.location.href = '/api/auth/google/signin' }}
               >
                 <span className="text-lg font-bold text-blue-500">G</span>
                 Log In with Google
@@ -2535,7 +2535,7 @@ function GoogleConnectScreen() {
 
   const connectGoogle = () => {
     // Redirect to NextAuth Google OAuth
-    window.location.href = '/api/auth/signin/google'
+    window.location.href = '/api/auth/google/signin'
   }
 
   const finish = () => {
@@ -5755,7 +5755,7 @@ function SettingsView() {
             </div>
             <div className="mt-3 flex gap-2">
               <Button size="sm" variant="outline" className="border-[#272b34] btn-hover text-xs"
-                onClick={() => { window.location.href = '/api/auth/signin/google' }}>
+                onClick={() => { window.location.href = '/api/auth/google/signin' }}>
                 <RotateCcw className="w-3 h-3 mr-1" /> Reconnect Google
               </Button>
               {store.googleToken && (
@@ -6402,41 +6402,43 @@ export default function Home() {
   // Handle returning from Google OAuth callback
   useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search)
-    if (urlParams.get('googleConnected') === 'true') {
-      // Fetch the NextAuth session to get our sessionToken
-      fetch('/api/auth/session')
+    const googleConnected = urlParams.get('googleConnected')
+    const googleError = urlParams.get('googleError')
+    const sessionToken = urlParams.get('sessionToken')
+
+    if (googleError) {
+      toast.error('Google sign-in failed. Please try the guest signup instead!')
+      window.history.replaceState({}, '', '/')
+    } else if (googleConnected === 'true' && sessionToken) {
+      // Custom Google OAuth callback - sessionToken is passed directly
+      fetch('/api/auth/me', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionToken }),
+      })
         .then((r) => r.json())
-        .then((session) => {
-          if (session?.sessionToken) {
-            // Find user by session token and load their data
-            fetch('/api/auth/me', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ sessionToken: session.sessionToken }),
+        .then((data) => {
+          if (data.user) {
+            store.setAuth({
+              sessionToken,
+              userId: data.user.id,
+              userName: data.user.name || '',
+              userEmail: data.user.email,
+              userPicture: data.user.picture || undefined,
+              provider: 'google',
             })
-              .then((r) => r.json())
-              .then((data) => {
-                if (data.user) {
-                  store.setAuth({
-                    sessionToken: session.sessionToken,
-                    userId: data.user.id,
-                    userName: data.user.name || '',
-                    userEmail: data.user.email,
-                    userPicture: data.user.picture || undefined,
-                    provider: 'google',
-                  })
-                  store.setGoogle({
-                    googleToken: 'oauth_connected',
-                    googleEmail:
-                      data.user.googleEmail || data.user.email,
-                  })
-                  store.setView('app')
-                  toast.success('Google connected successfully!')
-                }
-              })
+            store.setGoogle({
+              googleToken: 'oauth_connected',
+              googleEmail: data.user.googleEmail || data.user.email,
+            })
+            if (data.user.topic) {
+              store.setView('app')
+            } else {
+              store.setView('onboarding')
+            }
+            toast.success('Google connected successfully!')
           }
         })
-      // Clean URL
       window.history.replaceState({}, '', '/')
     }
   }, [store])
