@@ -1,12 +1,27 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Models to test — these are the same ones in the fallback chain
+// Comprehensive list of possible Gemini model names to test
 const TEST_MODELS = [
+  // Current models
   'gemini-2.0-flash-lite',
-  'gemini-1.5-flash-8b',
-  'gemini-1.5-flash',
   'gemini-2.0-flash',
+  // 1.5 variants
+  'gemini-1.5-flash',
+  'gemini-1.5-flash-8b',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-pro',
+  'gemini-1.5-pro-latest',
+  // 2.5 variants
+  'gemini-2.5-flash-preview-05-20',
+  'gemini-2.5-pro-preview-05-06',
+  // Experimental
+  'gemini-2.0-flash-exp',
+  'gemini-exp-1206',
+  // Legacy
+  'gemini-pro',
+  'gemini-1.0-pro',
+  'gemini-1.0-pro-latest',
 ];
 
 export async function GET() {
@@ -22,6 +37,7 @@ export async function GET() {
     GEMINI_API_KEY: geminiApiKey ? `SET (length: ${geminiApiKey.length})` : 'MISSING',
     effectiveKeySource,
     modelTests: {},
+    workingModels: [] as string[],
   };
 
   if (!effectiveKey) {
@@ -29,7 +45,7 @@ export async function GET() {
     return NextResponse.json(result);
   }
 
-  // Test each model in the fallback chain
+  // Test ALL models to discover which ones work
   const genAI = new GoogleGenerativeAI(effectiveKey);
   
   for (const model of TEST_MODELS) {
@@ -42,13 +58,13 @@ export async function GET() {
         status: 'SUCCESS',
         response: text.slice(0, 100),
       };
-      // Stop at first successful model — no need to waste quota testing all
-      break;
+      (result.workingModels as string[]).push(model);
     } catch (err: unknown) {
       const errMsg = (err as Error).message?.slice(0, 300) || String(err);
       const is429 = errMsg.includes('429') || errMsg.includes('Too Many Requests') || errMsg.includes('quota');
+      const is404 = errMsg.includes('404') || errMsg.includes('not found');
       (result.modelTests as Record<string, unknown>)[model] = {
-        status: is429 ? 'RATE_LIMITED' : 'FAILED',
+        status: is429 ? 'RATE_LIMITED' : is404 ? 'NOT_FOUND' : 'FAILED',
         error: errMsg,
       };
     }
