@@ -28,9 +28,20 @@ ENV DATABASE_URL="file:/app/data/custom.db"
 
 # Create .z-ai-config from environment variables at startup
 # Required env vars: ZAI_BASE_URL, ZAI_API_KEY, ZAI_CHAT_ID, ZAI_TOKEN, ZAI_USER_ID
-# These should be set in HF Spaces Settings > Variables and Secrets
+# NEXTAUTH_URL: Auto-detected from SPACE_HOST on HF Spaces, or set manually
 COPY <<'EOF' /app/start.sh
 #!/bin/sh
+
+# Auto-detect NEXTAUTH_URL from HF Spaces SPACE_HOST if not set
+if [ -z "$NEXTAUTH_URL" ] && [ -n "$SPACE_HOST" ]; then
+  export NEXTAUTH_URL="https://${SPACE_HOST}"
+  echo "Auto-detected NEXTAUTH_URL from SPACE_HOST: $NEXTAUTH_URL"
+elif [ -z "$NEXTAUTH_URL" ]; then
+  export NEXTAUTH_URL="http://localhost:3000"
+  echo "No NEXTAUTH_URL set, using default: $NEXTAUTH_URL"
+else
+  echo "Using configured NEXTAUTH_URL: $NEXTAUTH_URL"
+fi
 
 # Create .z-ai-config from env vars
 if [ -n "$ZAI_BASE_URL" ] && [ -n "$ZAI_API_KEY" ]; then
