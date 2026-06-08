@@ -4,7 +4,13 @@ import crypto from 'crypto';
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET!;
-const REDIRECT_URI = `${process.env.NEXTAUTH_URL || ''}/api/auth/google/callback`;
+const NEXTAUTH_URL = process.env.NEXTAUTH_URL || 'http://localhost:3000';
+const REDIRECT_URI = `${NEXTAUTH_URL}/api/auth/google/callback`;
+
+// Helper to build public URLs (not internal Docker 0.0.0.0 ones)
+function publicUrl(path: string) {
+  return `${NEXTAUTH_URL}${path}`;
+}
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -13,7 +19,7 @@ export async function GET(request: Request) {
 
   if (error || !code) {
     console.error('[Google OAuth] Error:', error || 'No code received');
-    return NextResponse.redirect(new URL('/?googleError=true', request.url));
+    return NextResponse.redirect(publicUrl('/?googleError=true'));
   }
 
   try {
@@ -33,7 +39,7 @@ export async function GET(request: Request) {
     if (!tokenRes.ok) {
       const errText = await tokenRes.text();
       console.error('[Google OAuth] Token exchange failed:', errText);
-      return NextResponse.redirect(new URL('/?googleError=true', request.url));
+      return NextResponse.redirect(publicUrl('/?googleError=true'));
     }
 
     const tokens = await tokenRes.json();
@@ -45,7 +51,7 @@ export async function GET(request: Request) {
 
     if (!userRes.ok) {
       console.error('[Google OAuth] Failed to fetch user info');
-      return NextResponse.redirect(new URL('/?googleError=true', request.url));
+      return NextResponse.redirect(publicUrl('/?googleError=true'));
     }
 
     const googleUser = await userRes.json();
@@ -100,13 +106,12 @@ export async function GET(request: Request) {
       });
     }
 
-    // Redirect to app with session token
-    const redirectUrl = new URL('/', request.url);
-    redirectUrl.searchParams.set('googleConnected', 'true');
-    redirectUrl.searchParams.set('sessionToken', dbUser.sessionToken);
+    // Redirect to app with session token using PUBLIC URL
+    const redirectUrl = publicUrl(`/?googleConnected=true&sessionToken=${dbUser.sessionToken}`);
+    console.log('[Google OAuth] Success! Redirecting to:', redirectUrl);
     return NextResponse.redirect(redirectUrl);
   } catch (err) {
     console.error('[Google OAuth] Callback error:', err);
-    return NextResponse.redirect(new URL('/?googleError=true', request.url));
+    return NextResponse.redirect(publicUrl('/?googleError=true'));
   }
 }
