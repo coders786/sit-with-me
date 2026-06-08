@@ -10,8 +10,8 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Detect which Gemini key to use (GEMINI_API_KEY preferred, fallback to GEMINI_KEY)
-const GEMINI_KEY = process.env.GEMINI_API_KEY || process.env.GEMINI_KEY;
+// Detect which Gemini key to use (GEMINI_KEY preferred as it's the valid one on HF Spaces, fallback to GEMINI_API_KEY)
+const GEMINI_KEY = process.env.GEMINI_KEY || process.env.GEMINI_API_KEY;
 const isProductionMode = !!GEMINI_KEY;
 
 console.log('[ai-sdk] Mode:', isProductionMode ? 'PRODUCTION (Gemini)' : 'LOCAL (z-ai-web-dev-sdk)');
