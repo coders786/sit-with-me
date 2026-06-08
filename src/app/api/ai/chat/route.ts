@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { chatCompletion } from '@/lib/ai-sdk';
+import { chatCompletion, MODELS } from '@/lib/ai-sdk';
 import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 export async function POST(request: Request) {
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    const reply = await chatCompletion({ model: 'gemini-2.0-flash', messages, temperature: 0.9 }) || "Hmm, I'm here — tell me more?";
+    const reply = await chatCompletion({ model: MODELS.SMART, messages, temperature: 0.9 }) || "Hmm, I'm here — tell me more?";
 
     // Save assistant message
     await db.chatMessage.create({

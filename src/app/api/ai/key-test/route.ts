@@ -1,18 +1,11 @@
 import { NextResponse } from 'next/server';
-import { chatCompletion } from '@/lib/ai-sdk';
+import { chatCompletion, MODELS } from '@/lib/ai-sdk';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const { apiKey } = body;
-
-    if (!apiKey) {
-      return NextResponse.json({ ok: false, error: 'API key is required' }, { status: 400 });
-    }
-
-    // Try a simple call to Gemini using the dual-sdk
+    // Simple test — just call the configured AI and see if it responds
     const content = await chatCompletion({
-      model: 'gemini-2.0-flash',
+      model: MODELS.FAST,
       messages: [
         { role: 'user', content: 'Say "OK" and nothing else.' },
       ],

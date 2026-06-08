@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { chatCompletion } from '@/lib/ai-sdk';
+import { chatCompletion, MODELS } from '@/lib/ai-sdk';
 import { buildSystemPrompt, buildUserProfileContext } from '@/lib/ai-personality';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     });
 
     const content = await chatCompletion({
-      model: 'gemini-2.0-flash',
+      model: MODELS.SMART,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: 'Create my personalized 7-day learning plan.' },

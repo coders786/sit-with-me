@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { chatCompletion } from '@/lib/ai-sdk';
+import { chatCompletion, MODELS } from '@/lib/ai-sdk';
 import { buildSystemPrompt } from '@/lib/ai-personality';
 
 const ONBOARDING_ADDITIONAL_RULES = [
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     }
 
     // Call AI via dual-mode SDK
-    const reply = await chatCompletion({ model: 'gemini-2.0-flash', messages, temperature: 0.9 });
+    const reply = await chatCompletion({ model: MODELS.SMART, messages, temperature: 0.9 });
 
     // Save assistant message
     await db.chatMessage.create({

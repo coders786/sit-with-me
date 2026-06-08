@@ -6,16 +6,29 @@
  * 
  * The SDK auto-detects which mode to use based on whether
  * a valid Gemini API key is available.
+ * 
+ * Key priority: GEMINI_KEY > GEMINI_API_KEY
+ * (GEMINI_KEY is the valid key on HF Spaces; GEMINI_API_KEY may be invalid)
  */
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Detect which Gemini key to use (GEMINI_KEY preferred as it's the valid one on HF Spaces, fallback to GEMINI_API_KEY)
+// ── Model Constants ──────────────────────────────────────────────
+export const MODELS = {
+  /** Fast/cheap model for simple JSON-output tasks */
+  FAST: 'gemini-2.0-flash-lite',
+  /** Smart model for conversation & complex reasoning */
+  SMART: 'gemini-2.0-flash',
+} as const;
+
+// ── Key Detection ────────────────────────────────────────────────
+// GEMINI_KEY (39 chars) is the valid key on HF Spaces
+// GEMINI_API_KEY (24 chars) is often invalid — only use as fallback
 const GEMINI_KEY = process.env.GEMINI_KEY || process.env.GEMINI_API_KEY;
 const isProductionMode = !!GEMINI_KEY;
 
 console.log('[ai-sdk] Mode:', isProductionMode ? 'PRODUCTION (Gemini)' : 'LOCAL (z-ai-web-dev-sdk)');
-console.log('[ai-sdk] Key source:', process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : process.env.GEMINI_KEY ? 'GEMINI_KEY' : 'NONE');
+console.log('[ai-sdk] Key source:', process.env.GEMINI_KEY ? 'GEMINI_KEY' : process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : 'NONE');
 
 /**
  * Send a chat completion request using the best available SDK
@@ -27,7 +40,7 @@ export async function chatCompletion(options: {
   maxTokens?: number;
 }): Promise<string> {
   const {
-    model = 'gemini-2.0-flash',
+    model = MODELS.SMART,
     messages,
     temperature = 0.9,
     maxTokens = 2048,
@@ -120,8 +133,9 @@ async function zaiCompletion(
     throw new Error('Empty response from ZAI SDK');
   } catch (error) {
     console.error('[ai-sdk] ZAI SDK error, falling back to Gemini:', error);
-    // If ZAI fails and we have a Gemini key, try that instead
-    if (GEMINI_KEY) {
+    // Only fall back to Gemini if the VALID key (GEMINI_KEY) exists
+    // Don't fall back to GEMINI_API_KEY — it may be invalid
+    if (process.env.GEMINI_KEY) {
       return geminiCompletion(model, messages, temperature, 2048);
     }
     throw error;
